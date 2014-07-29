@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 /***************************************************************************
- VectorBender
+ RasterBender
                                  A QGIS plugin
  Deforms vector to adapt them despite heavy and irregular deformations
                               -------------------
@@ -39,21 +39,21 @@ try:
     minVersion = '1.3.0'
     if StrictVersion(matplotlib.__version__) < StrictVersion(minVersion):
         dependenciesStatus=1
-        QgsMessageLog.logMessage("Matplotlib version too old (%s instead of %s). You won't be able to use the bending algorithm" % (matplotlib.__version__,minVersion), 'VectorBender')
+        QgsMessageLog.logMessage("Matplotlib version too old (%s instead of %s). You won't be able to use the bending algorithm" % (matplotlib.__version__,minVersion), 'RasterBender')
 except Exception, e:
-    QgsMessageLog.logMessage("Matplotlib is missing. You won't be able to use the bending algorithm", 'VectorBender')
+    QgsMessageLog.logMessage("Matplotlib is missing. You won't be able to use the bending algorithm", 'RasterBender')
     dependenciesStatus = 0
 
 # Other classes
-from vectorbendertransformers import *
-from vectorbenderdialog import VectorBenderDialog
-from vectorbenderhelp import VectorBenderHelp
+from rasterbendertransformers import *
+from rasterbenderdialog import RasterBenderDialog
+from rasterbenderhelp import RasterBenderHelp
 
-class VectorBender:
+class RasterBender:
 
     def __init__(self, iface):
         self.iface = iface
-        self.dlg = VectorBenderDialog(iface,self)
+        self.dlg = RasterBenderDialog(iface,self)
 
         self.ptsA = []
         self.ptsB = []
@@ -65,18 +65,18 @@ class VectorBender:
 
     def initGui(self):
         
-        self.action = QAction( QIcon(os.path.join(os.path.dirname(__file__),'resources','icon.png')), "Vector Bender", self.iface.mainWindow())
+        self.action = QAction( QIcon(os.path.join(os.path.dirname(__file__),'resources','icon.png')), "Raster Bender", self.iface.mainWindow())
         self.action.triggered.connect(self.showUi)
         self.iface.addToolBarIcon(self.action)
-        self.iface.addPluginToMenu(u"&Vector Bender", self.action)
+        self.iface.addPluginToMenu(u"&Raster Bender", self.action)
 
-        self.helpAction = QAction( QIcon(os.path.join(os.path.dirname(__file__),'resources','about.png')), "Vector Bender Help", self.iface.mainWindow())
+        self.helpAction = QAction( QIcon(os.path.join(os.path.dirname(__file__),'resources','about.png')), "Raster Bender Help", self.iface.mainWindow())
         self.helpAction.triggered.connect(self.showHelp)
-        self.iface.addPluginToMenu(u"&Vector Bender", self.helpAction)
+        self.iface.addPluginToMenu(u"&Raster Bender", self.helpAction)
 
     def showHelp(self):
         if self.aboutWindow is None:
-            self.aboutWindow = VectorBenderHelp()
+            self.aboutWindow = RasterBenderHelp()
         self.aboutWindow.show()
         self.aboutWindow.raise_() 
 
@@ -89,8 +89,8 @@ class VectorBender:
             self.aboutWindow.close()
             self.aboutWindow = None
 
-        self.iface.removePluginMenu(u"&Vector Bender", self.action)
-        self.iface.removePluginMenu(u"&Vector Bender", self.helpAction)
+        self.iface.removePluginMenu(u"&Raster Bender", self.action)
+        self.iface.removePluginMenu(u"&Raster Bender", self.helpAction)
         self.iface.removeToolBarIcon(self.action)
 
     def showUi(self):

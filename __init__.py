@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 /***************************************************************************
- VectorBender
+ RasterBender
                                  A QGIS plugin
  Deforms vector to adapt them despite heavy and irregular deformations
                              -------------------
@@ -21,6 +21,6 @@
  This script initializes the plugin, making it known to QGIS.
 """
 def classFactory(iface):
-    # load VectorBender class from file VectorBender
-    from vectorbender import VectorBender
-    return VectorBender(iface)
+    # load RasterBender class from file RasterBender
+    from rasterbender import RasterBender
+    return RasterBender(iface)

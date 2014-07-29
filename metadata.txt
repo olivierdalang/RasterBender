@@ -9,7 +9,7 @@
 
 
 [general]
-name=Vector Bender
+name=Raster Bender
 qgisMinimumVersion=2.2
 description=Does to vectors what georefencers does to raster. This feature is also known as "rubber sheeting".
 category=Vector
@@ -31,9 +31,9 @@ changelog=- 2014-05-22 - Version 0.0 : intial release
 # tags are comma separated with spaces allowed
 tags=vector,georeference,deform,adapt,transform,affine,translate,distort,match,rubber sheet
 
-homepage=https://github.com/olivierdalang/VectorBender
-tracker=https://github.com/olivierdalang/VectorBender/issues
-repository=git@github.com:olivierdalang/VectorBender.git
+homepage=https://github.com/olivierdalang/RasterBender
+tracker=https://github.com/olivierdalang/RasterBender/issues
+repository=git@github.com:olivierdalang/RasterBender.git
 icon=resources/icon.png
 # experimental flag
 experimental=True

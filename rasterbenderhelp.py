@@ -27,7 +27,7 @@ from qgis.core import *
 # Basic dependencies
 import os.path
 
-class VectorBenderHelp(QDialog):
+class RasterBenderHelp(QDialog):
 
     def __init__(self):
         QDialog.__init__(self)
@@ -37,7 +37,7 @@ class VectorBenderHelp(QDialog):
 
         self.helpFile = os.path.join(os.path.dirname(__file__),'README.html')
         
-        self.setWindowTitle('VectorBender')
+        self.setWindowTitle('RasterBender')
 
         txt = QTextBrowser()
         txt.setReadOnly(True)

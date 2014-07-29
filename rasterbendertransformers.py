@@ -3,7 +3,7 @@ from qgis.core import *
 import math
 
 try:
-    #we silently fail the import here since message is already taken car in vectorbender.py
+    #we silently fail the import here since message is already taken car in rasterbender.py
     import matplotlib.tri
 except Exception, e:
     pass

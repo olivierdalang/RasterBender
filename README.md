@@ -1,6 +1,6 @@
-# ![create pairs layers](resources/icon.png) ![create pairs layers](resources/icon.png) ![create pairs layers](resources/icon.png) VectorBender ![create pairs layers](resources/icon.png) ![create pairs layers](resources/icon.png) ![create pairs layers](resources/icon.png)
+# ![create pairs layers](resources/icon.png) ![create pairs layers](resources/icon.png) ![create pairs layers](resources/icon.png) RasterBender ![create pairs layers](resources/icon.png) ![create pairs layers](resources/icon.png) ![create pairs layers](resources/icon.png)
 
-VectorBender is an __EXPERIMENTAL__ QGIS Python plugin allowing to transform vector layers to match another geometry. Depening on the number of input points defined, the plugin chooses on of the three transformation types : translation, uniform, or bending.
+RasterBender is an __EXPERIMENTAL__ QGIS Python plugin allowing to transform vector layers to match another geometry. Depening on the number of input points defined, the plugin chooses on of the three transformation types : translation, uniform, or bending.
 
 The first two allow for quick alignement of non georeferenced data, where as the third allows to match data that has complex non-uniform and non-linear deformations (historical maps, hand drawn sketches, poorly digitized layers...). 
 
@@ -9,14 +9,14 @@ The first two allow for quick alignement of non georeferenced data, where as the
 
 ## How to use
 
-Launch VectorBender from the plugins menu or from the plugin toolbar.
+Launch RasterBender from the plugins menu or from the plugin toolbar.
 
-VectorBender works a bit like the georeferencer : you have to create pairs of points, the first one being the original location, and the second one being the target location.
+RasterBender works a bit like the georeferencer : you have to create pairs of points, the first one being the original location, and the second one being the target location.
 
-To do so, VectorBender uses plain Linestring layers. Each pair is defined by the starting point and ending point of a Line in this layer.
-You can either use one of your own Linestring layers, or use the ![create pairs layers](resources/mActionCaptureLine.png) button from the VectorBender window.
+To do so, RasterBender uses plain Linestring layers. Each pair is defined by the starting point and ending point of a Line in this layer.
+You can either use one of your own Linestring layers, or use the ![create pairs layers](resources/mActionCaptureLine.png) button from the RasterBender window.
 
-If you use VectorBender's layers, I recommend installing the "Save memory layer" plugin which will allow to save your work.
+If you use RasterBender's layers, I recommend installing the "Save memory layer" plugin which will allow to save your work.
 
 Depending on the number of created (or selected, if you choose "restrict to selection") pairs, one of the three methods (explained below) will be used.
 
@@ -57,7 +57,7 @@ Please send me an email me if you encoutered this problem and solved it in an ea
 
 ## Feedback / Bugs / Contribute
 
-Please report bugs and ideas on the issue tracker : https://github.com/olivierdalang/VectorBender/issues
+Please report bugs and ideas on the issue tracker : https://github.com/olivierdalang/RasterBender/issues
 
 Or send me some feedback at : olivier.dalang@gmail.com
 
@@ -82,7 +82,7 @@ Here's how it works :
 
 Preparing the mesh
 
-1. Get a triangular mesh by doing a Delaunay triangulation of all original input points (starting points of the lines in the Vector Bender layer)
+1. Get a triangular mesh by doing a Delaunay triangulation of all original input points (starting points of the lines in the Raster Bender layer)
 2. Adapt this mesh on the ending points of the lines
 3. Get the convex hull of the points, offset it by some factor to have a smooth transition on the borders.
 

@@ -1,6 +1,6 @@
-<h1><img src="resources/icon.png" alt="create pairs layers" /> <img src="resources/icon.png" alt="create pairs layers" /> <img src="resources/icon.png" alt="create pairs layers" /> VectorBender <img src="resources/icon.png" alt="create pairs layers" /> <img src="resources/icon.png" alt="create pairs layers" /> <img src="resources/icon.png" alt="create pairs layers" /></h1>
+<h1><img src="resources/icon.png" alt="create pairs layers" /> <img src="resources/icon.png" alt="create pairs layers" /> <img src="resources/icon.png" alt="create pairs layers" /> RasterBender <img src="resources/icon.png" alt="create pairs layers" /> <img src="resources/icon.png" alt="create pairs layers" /> <img src="resources/icon.png" alt="create pairs layers" /></h1>
 
-<p>VectorBender is an <strong>EXPERIMENTAL</strong> QGIS Python plugin allowing to transform vector layers to match another geometry. Depening on the number of input points defined, the plugin chooses on of the three transformation types : translation, uniform, or bending.</p>
+<p>RasterBender is an <strong>EXPERIMENTAL</strong> QGIS Python plugin allowing to transform vector layers to match another geometry. Depening on the number of input points defined, the plugin chooses on of the three transformation types : translation, uniform, or bending.</p>
 
 <p>The first two allow for quick alignement of non georeferenced data, where as the third allows to match data that has complex non-uniform and non-linear deformations (historical maps, hand drawn sketches, poorly digitized layers...). </p>
 
@@ -8,14 +8,14 @@
 
 <h2>How to use</h2>
 
-<p>Launch VectorBender from the plugins menu or from the plugin toolbar.</p>
+<p>Launch RasterBender from the plugins menu or from the plugin toolbar.</p>
 
-<p>VectorBender works a bit like the georeferencer : you have to create pairs of points, the first one being the original location, and the second one being the target location.</p>
+<p>RasterBender works a bit like the georeferencer : you have to create pairs of points, the first one being the original location, and the second one being the target location.</p>
 
-<p>To do so, VectorBender uses plain Linestring layers. Each pair is defined by the starting point and ending point of a Line in this layer.
-You can either use one of your own Linestring layers, or use the <img src="resources/mActionCaptureLine.png" alt="create pairs layers" /> button from the VectorBender window.</p>
+<p>To do so, RasterBender uses plain Linestring layers. Each pair is defined by the starting point and ending point of a Line in this layer.
+You can either use one of your own Linestring layers, or use the <img src="resources/mActionCaptureLine.png" alt="create pairs layers" /> button from the RasterBender window.</p>
 
-<p>If you use VectorBender's layers, I recommend installing the "Save memory layer" plugin which will allow to save your work.</p>
+<p>If you use RasterBender's layers, I recommend installing the "Save memory layer" plugin which will allow to save your work.</p>
 
 <p>Depending on the number of created (or selected, if you choose "restrict to selection") pairs, one of the three methods (explained below) will be used.</p>
 
@@ -53,7 +53,7 @@ You can still undo / revert the changes if you like.</p>
 
 <h2>Feedback / Bugs / Contribute</h2>
 
-<p>Please report bugs and ideas on the issue tracker : https://github.com/olivierdalang/VectorBender/issues</p>
+<p>Please report bugs and ideas on the issue tracker : https://github.com/olivierdalang/RasterBender/issues</p>
 
 <p>Or send me some feedback at : olivier.dalang@gmail.com</p>
 
@@ -80,7 +80,7 @@ You can still undo / revert the changes if you like.</p>
 <p>Preparing the mesh</p>
 
 <ol>
-<li>Get a triangular mesh by doing a Delaunay triangulation of all original input points (starting points of the lines in the Vector Bender layer)</li>
+<li>Get a triangular mesh by doing a Delaunay triangulation of all original input points (starting points of the lines in the Raster Bender layer)</li>
 <li>Adapt this mesh on the ending points of the lines</li>
 <li>Get the convex hull of the points, offset it by some factor to have a smooth transition on the borders.</li>
 </ol>

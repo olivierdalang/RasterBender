@@ -9,10 +9,10 @@ from qgis.gui import *
 
 import os.path
 
-from vectorbendertransformers import *
+from rasterbendertransformers import *
 
 
-class VectorBenderDialog(QWidget):
+class RasterBenderDialog(QWidget):
     def __init__(self, iface, vb):
         QWidget.__init__(self)
         uic.loadUi(os.path.join(os.path.dirname(__file__),'ui_main.ui'), self)
@@ -189,7 +189,7 @@ class VectorBenderDialog(QWidget):
         """
 
         suffix = ""
-        name = "Vector Bender"
+        name = "Raster Bender"
         while len( QgsMapLayerRegistry.instance().mapLayersByName( name+suffix ) ) > 0:
             if suffix == "": suffix = " 1"
             else: suffix = " "+str(int(suffix)+1)

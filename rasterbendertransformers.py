@@ -20,8 +20,8 @@ class Transformer():
 
         for feature in features:
             geom = feature.geometry().asPolyline()
-            self.pointsA.append( QgsPoint(geom[0].x(),geom[0].y()) )
-            self.pointsB.append( QgsPoint(geom[-1].x(),geom[-1].y()) )
+            self.pointsB.append( QgsPoint(geom[0].x(),geom[0].y()) )
+            self.pointsA.append( QgsPoint(geom[-1].x(),geom[-1].y()) )
 
     def map(self, p):
         return p

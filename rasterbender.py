@@ -27,9 +27,12 @@ from qgis.core import *
 from qgis.gui import *
 
 # Basic dependencies
+from osgeo import gdal  
+from osgeo import gdalnumeric
 import os.path
 import sys
 import math
+import numpy
 
 # More tricky dependencies
 from distutils.version import StrictVersion
@@ -111,7 +114,7 @@ class RasterBender:
         if pairsLayer is None:
             return 0
 
-        featuresCount = len(pairsLayer.selectedFeaturesIds()) if self.dlg.restrictBox_pairsLayer.isChecked() else len(pairsLayer.allFeatureIds())
+        featuresCount = len(pairsLayer.selectedFeaturesIds()) if self.dlg.pairsLayerRestrictToSelectionCheckBox.isChecked() else len(pairsLayer.allFeatureIds())
         
         if featuresCount == 1:
             return 1
@@ -129,13 +132,14 @@ class RasterBender:
 
         self.dlg.progressBar.setValue( 0 )
 
-        toBendLayer = self.dlg.toBendLayer()
+        #targetRaster = self.dlg.targetRaster()
+        #sourceRaster = self.dlg.sourceRaster()
         pairsLayer = self.dlg.pairsLayer()
 
         transType = self.determineTransformationType()
 
         # Loading the delaunay
-        restrictToSelection = self.dlg.restrictBox_pairsLayer.isChecked()
+        restrictToSelection = self.dlg.pairsLayerRestrictToSelectionCheckBox.isChecked()
         if transType==3:
             self.dlg.displayMsg( "Loading delaunay mesh (%i points) ..." % len(self.ptsA) )
             QCoreApplication.processEvents()
@@ -150,18 +154,111 @@ class RasterBender:
             self.dlg.displayMsg( "INVALID TRANSFORMATION TYPE - YOU SHOULDN'T HAVE BEEN ABLE TO HIT RUN" )
             return
 
-        # Starting to iterate
+        # Starting to through all target pixels
+
+        #Open the dataset
+        gdal.UseExceptions()
+
+
+
+        # Read the source data into numpy arrays
+        dsSource = gdal.Open("D:\Users\Olivier\Dropbox\Programmation\QGIS\Misc\RasterBender\\fg.12_clipped.tif", gdal.GA_ReadOnly ) 
+
+        sourceDataR = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1))
+        sourceDataG = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2))
+        sourceDataB = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3))
+
+        # Open the target into numpy array
+        dsTarget = gdal.Open("D:\Users\Olivier\Dropbox\Programmation\QGIS\Misc\RasterBender\\fg.12_clipped_bent.tif", gdal.GA_Update )
+
+
+        targetDataR = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )
+        targetDataG = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )
+        targetDataB = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )
+
+        # Loop through every pixel
+
+        displayTotal = dsTarget.RasterXSize*dsTarget.RasterYSize
+        displayStep = int(displayTotal/100)
+        displayCount = 0
+
+        
+        pixW = float(dsTarget.RasterXSize-1)
+        pixH = float(dsTarget.RasterYSize-1)
+        mapW = float(dsTarget.RasterXSize)*dsTarget.GetGeoTransform()[1]
+        mapH = float(dsTarget.RasterYSize)*dsTarget.GetGeoTransform()[5]
+        offX = dsTarget.GetGeoTransform()[0]
+        offY = dsTarget.GetGeoTransform()[3]
+
+        def xyToQgsPoint(x, y):
+            return QgsPoint( offX + mapW * (x/pixW), offY + mapH * (y/pixH) )
+        def qgsPointToXY(qgspoint):
+            return ( int((qgspoint.x() - offX) / mapW * pixW ) , int((qgspoint.y() - offY) / mapH * pixH ) )
+
+
+        #def xyToQgsPoint(x, y):
+        #    return QgsPoint( offX + mapW * (x/pixW), offY + mapH * (1.0-y/pixH) )
+        #def qgsPointToXY(qgspoint):
+        #    return ( int((qgspoint.x() - offX) / mapW * pixW ) , int( - ((qgspoint.y() - offY) / mapH - 1.0 ) * pixH ) )
+
+
+        for y in range(0, dsTarget.RasterYSize):
+            for x in range(0, dsTarget.RasterXSize):
+
+                displayCount+=1
+                if displayCount%displayStep == 0:
+                    self.dlg.progressBar.setValue( int(100.0*float(displayCount)/float(displayTotal)) )
+                    self.dlg.displayMsg( "Working on pixel %i out of %i..."  % (displayCount, displayTotal))
+                    QCoreApplication.processEvents()
+
+                newX, newY = qgsPointToXY(  self.transformer.map( xyToQgsPoint(x,y) )  )
+
+                try:
+                    targetDataR[y][x] = sourceDataR[newY][newX]
+                    targetDataG[y][x] = sourceDataG[newY][newX]
+                    targetDataB[y][x] = sourceDataB[newY][newX]
+                except IndexError, e:
+                    targetDataR[y][x] = 0
+                    targetDataG[y][x] = 0
+                    targetDataB[y][x] = 0
+
+                #px = extent.xMinimum() + extent.width() * x / float( targetRaster.width()-1 )
+                #py = extent.yMinimum() + extent.height() * y / float( targetRaster.height()-1 )
+                #pt = QgsPoint( px, py )
+
+                #ident = sourceRaster.dataProvider().identify( pt, QgsRaster.IdentifyFormatValue)
+
+                #targetDataR[y][x] = ident.results()[1]
+                #targetDataG[y][x] = ident.results()[2]
+                #targetDataB[y][x] = ident.results()[3]
+
+
+        self.dlg.progressBar.setValue( 0 )
+        self.dlg.displayMsg( "Writing to file..." )
+
+
+        gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(1), targetDataR)  
+        gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(2), targetDataG)  
+        gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(3), targetDataB)
+
+
+
+        self.dlg.progressBar.setValue( 100 )
+        self.dlg.displayMsg( "Done !" )
+
+        return
+
         features = toBendLayer.getFeatures() if not self.dlg.restrictBox_toBendLayer.isChecked() else toBendLayer.selectedFeatures()
 
-        count = toBendLayer.pendingFeatureCount() if not self.dlg.restrictBox_toBendLayer.isChecked() else len(features)
-        self.dlg.displayMsg( "Starting to iterate through %i features..." % count )
+        displayCount = toBendLayer.pendingFeatureCount() if not self.dlg.restrictBox_toBendLayer.isChecked() else len(features)
+        self.dlg.displayMsg( "Starting to iterate through %i features..." % displayCount )
         QCoreApplication.processEvents()
 
         toBendLayer.beginEditCommand("Feature bending")
         for i,feature in enumerate(features):
 
-            self.dlg.progressBar.setValue( int(100.0*float(i)/float(count)) )
-            self.dlg.displayMsg( "Aligning features %i out of %i..."  % (i, count))
+            self.dlg.progressBar.setValue( int(100.0*float(i)/float(displayCount)) )
+            self.dlg.displayMsg( "Aligning features %i out of %i..."  % (i, displayCount))
             QCoreApplication.processEvents()
 
             geom = feature.geometry()
@@ -244,18 +341,18 @@ class RasterBender:
         #Transforming pairs to pins
         if self.dlg.pairsToPinsCheckBox.isChecked():
 
-            features = pairsLayer.getFeatures() if not self.dlg.restrictBox_pairsLayer.isChecked() else pairsLayer.selectedFeatures()
+            features = pairsLayer.getFeatures() if not self.dlg.pairsLayerRestrictToSelectionCheckBox.isChecked() else pairsLayer.selectedFeatures()
 
-            count = pairsLayer.pendingFeatureCount() if not self.dlg.restrictBox_pairsLayer.isChecked() else len(features)
+            displayCount = pairsLayer.pendingFeatureCount() if not self.dlg.pairsLayerRestrictToSelectionCheckBox.isChecked() else len(features)
             self.dlg.progressBar.setValue( 0 )
-            self.dlg.displayMsg( "Starting to transform %i pairs to pins..." % count )
+            self.dlg.displayMsg( "Starting to transform %i pairs to pins..." % displayCount )
             QCoreApplication.processEvents()
 
             pairsLayer.beginEditCommand("Transforming pairs to pins")
             for i,feature in enumerate(features):
 
-                self.dlg.progressBar.setValue( int(100.0*float(i)/float(count)) )
-                self.dlg.displayMsg( "Transforming pair to pin %i out of %i..."  % (i, count))
+                self.dlg.progressBar.setValue( int(100.0*float(i)/float(displayCount)) )
+                self.dlg.displayMsg( "Transforming pair to pin %i out of %i..."  % (i, displayCount))
                 QCoreApplication.processEvents()
 
                 geom = feature.geometry().asPolyline()

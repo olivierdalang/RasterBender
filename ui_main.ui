@@ -35,7 +35,7 @@
       </sizepolicy>
      </property>
      <property name="text">
-      <string>Layer to bend</string>
+      <string>Source raster</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -45,7 +45,7 @@
    <item row="0" column="1">
     <layout class="QHBoxLayout" name="horizontalLayout_3">
      <item>
-      <widget class="QComboBox" name="comboBox_toBendLayer">
+      <widget class="QComboBox" name="sourceRasterComboBox">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
          <horstretch>1</horstretch>
@@ -54,30 +54,34 @@
        </property>
       </widget>
      </item>
-     <item>
-      <widget class="QToolButton" name="editModeButton_toBendLayer">
-       <property name="text">
-        <string>toggle edit</string>
-       </property>
-       <property name="icon">
-        <iconset>
-         <normaloff>resources/mIconEditable.png</normaloff>resources/mIconEditable.png</iconset>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="restrictBox_toBendLayer">
-       <property name="text">
-        <string>restrict to selection</string>
-       </property>
-      </widget>
-     </item>
     </layout>
    </item>
    <item row="1" column="0">
+    <widget class="QLabel" name="label_10">
+     <property name="text">
+      <string>Target raster</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <layout class="QHBoxLayout" name="horizontalLayout_8">
+     <item>
+      <widget class="QToolButton" name="createTargetRasterButton">
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="icon">
+        <iconset>
+         <normaloff>resources/raster-create.png</normaloff>resources/raster-create.png</iconset>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="targetRasterComboBox"/>
+     </item>
+    </layout>
+   </item>
+   <item row="2" column="0">
     <widget class="QLabel" name="label">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
@@ -93,7 +97,7 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
+   <item row="2" column="1">
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
       <widget class="QToolButton" name="createMemoryLayerButton">
@@ -107,7 +111,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QComboBox" name="comboBox_pairsLayer">
+      <widget class="QComboBox" name="pairsLayerComboBox">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
          <horstretch>1</horstretch>
@@ -117,7 +121,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="editModeButton_pairsLayer">
+      <widget class="QToolButton" name="pairsLayerEditModeButton">
        <property name="text">
         <string>toggle edit</string>
        </property>
@@ -131,36 +135,9 @@
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="restrictBox_pairsLayer">
+      <widget class="QCheckBox" name="pairsLayerRestrictToSelectionCheckBox">
        <property name="text">
         <string>restrict to selection</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="label_5">
-     <property name="text">
-      <string>Change pairs to pins</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="1">
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QCheckBox" name="pairsToPinsCheckBox">
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>22</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>(not recommended if you restrict to selection)</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -175,7 +152,7 @@
       <item>
        <widget class="QStackedWidget" name="stackedWidget">
         <property name="currentIndex">
-         <number>4</number>
+         <number>1</number>
         </property>
         <widget class="QWidget" name="page_0">
          <layout class="QHBoxLayout" name="horizontalLayout_7">
@@ -191,10 +168,13 @@
              </font>
             </property>
             <property name="text">
-             <string>Invalid. Please define pairs by creating lines in the pairs layers.</string>
+             <string>Invalid. Please define pairs by creating lines in the pairs layers (and select some of them if working on selection only).</string>
             </property>
             <property name="textFormat">
              <enum>Qt::AutoText</enum>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
             </property>
            </widget>
           </item>
@@ -214,7 +194,7 @@
              </font>
             </property>
             <property name="text">
-             <string>Translation - exactly 1 pair</string>
+             <string>Translation (creates a world file on the source raster) - exactly 1 pair</string>
             </property>
            </widget>
           </item>
@@ -234,7 +214,7 @@
              </font>
             </property>
             <property name="text">
-             <string>Linear - exactly 2 pairs</string>
+             <string>Linear (creates a world file on the source raster) - exactly 2 pairs</string>
             </property>
            </widget>
           </item>

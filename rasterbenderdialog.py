@@ -26,44 +26,44 @@ class RasterBenderDialog(QWidget):
         self.rubberBands = None
 
         # Connect the UI buttons
-        self.createMemoryLayerButton.clicked.connect(self.createMemoryLayer)
-
         self.previewButton.pressed.connect(self.showPreview)
         self.previewButton.released.connect(self.hidePreview)
 
-        self.editModeButton_toBendLayer.clicked.connect(self.toggleEditMode_toBendLayer)
-        self.editModeButton_pairsLayer.clicked.connect(self.toggleEditMode_pairsLayer)
+        self.createMemoryLayerButton.clicked.connect(self.createMemoryLayer)
+        self.createTargetRasterButton.clicked.connect(self.createTargetRaster)
+
+        self.pairsLayerEditModeButton.clicked.connect( self.toggleEditMode )
 
         self.runButton.clicked.connect(self.vb.run)
 
-        # When those are changed, we recheck the requirements
-        self.editModeButton_pairsLayer.clicked.connect(self.checkRequirements)
-        self.editModeButton_toBendLayer.clicked.connect(self.checkRequirements)
-        self.comboBox_toBendLayer.activated.connect( self.checkRequirements )
-        self.pairsToPinsCheckBox.clicked.connect( self.checkRequirements )
-
-        # When those are changed, we change the transformation type (which also checks the requirements)
-        self.comboBox_toBendLayer.activated.connect( self.updateEditState_toBendLayer )
-        self.comboBox_pairsLayer.activated.connect( self.updateEditState_pairsLayer )
-        self.comboBox_pairsLayer.activated.connect( self.updateTransformationType )
-        self.restrictBox_pairsLayer.stateChanged.connect( self.updateTransformationType )
+        # When those are changed, we refresh the states
+        self.sourceRasterComboBox.activated.connect( self.refreshStates )
+        self.targetRasterComboBox.activated.connect( self.refreshStates )
+        self.pairsLayerComboBox.activated.connect( self.refreshStates )
+        self.pairsLayerRestrictToSelectionCheckBox.stateChanged.connect( self.refreshStates )
 
         # Create an event filter to update on focus
         self.installEventFilter(self)
 
 
     # UI Getters
-    def toBendLayer(self):
+    def sourceRaster(self):
         """
-        Returns the current toBend layer depending on what is choosen in the comboBox_pairsLayer
+        Returns the current toBend layer depending on what is choosen in the pairsLayerComboBox
         """
-        layerId = self.comboBox_toBendLayer.itemData(self.comboBox_toBendLayer.currentIndex())
+        layerId = self.sourceRasterComboBox.itemData(self.sourceRasterComboBox.currentIndex())
+        return QgsMapLayerRegistry.instance().mapLayer(layerId)
+    def targetRaster(self):
+        """
+        Returns the current toBend layer depending on what is choosen in the pairsLayerComboBox
+        """
+        layerId = self.targetRasterComboBox.itemData(self.targetRasterComboBox.currentIndex())
         return QgsMapLayerRegistry.instance().mapLayer(layerId)
     def pairsLayer(self):
         """
-        Returns the current pairsLayer layer depending on what is choosen in the comboBox_pairsLayer
+        Returns the current pairsLayer layer depending on what is choosen in the pairsLayerComboBox
         """
-        layerId = self.comboBox_pairsLayer.itemData(self.comboBox_pairsLayer.currentIndex())
+        layerId = self.pairsLayerComboBox.itemData(self.pairsLayerComboBox.currentIndex())
         return QgsMapLayerRegistry.instance().mapLayer(layerId)
     def bufferValue(self):
         """
@@ -82,10 +82,54 @@ class RasterBenderDialog(QWidget):
 
         # Update the edit mode buttons
         self.updateEditState_pairsLayer()
-        self.updateEditState_toBendLayer()
 
         # Update the transformation type
         self.updateTransformationType()
+
+        # Chech the requirements
+        self.checkRequirements()
+
+    def updateLayersComboboxes(self):
+        """
+        Recreate the comboboxes to display existing layers.
+        """
+        oldSourceRaster = self.sourceRaster()
+        oldTargetRaster = self.targetRaster()
+        oldPairsLayer = self.pairsLayer()
+
+        self.sourceRasterComboBox.clear()
+        self.targetRasterComboBox.clear()
+        self.pairsLayerComboBox.clear()
+        for layer in self.iface.legendInterface().layers():
+            if layer.type() == QgsMapLayer.VectorLayer:
+                if layer.geometryType() == QGis.Line :
+                    self.pairsLayerComboBox.addItem( layer.name(), layer.id() )
+            elif layer.type() == QgsMapLayer.RasterLayer:
+                self.sourceRasterComboBox.addItem( layer.name(), layer.id() )
+                self.targetRasterComboBox.addItem( layer.name(), layer.id() )
+
+        if oldSourceRaster is not None:
+            index = self.sourceRasterComboBox.findData(oldSourceRaster.id())
+            self.sourceRasterComboBox.setCurrentIndex( index )
+        if oldTargetRaster is not None:
+            index = self.sourceRasterComboBox.findData(oldTargetRaster.id())
+            self.targetRasterComboBox.setCurrentIndex( index )
+        if oldPairsLayer is not None:
+            index = self.pairsLayerComboBox.findData(oldPairsLayer.id())
+            self.pairsLayerComboBox.setCurrentIndex( index )
+    def updateEditState_pairsLayer(self):
+        """
+        Update the edit state button for pairsLayer
+        """
+        l = self.pairsLayer()
+        self.pairsLayerEditModeButton.setChecked( False if (l is None or not l.isEditable()) else True )
+    def updateTransformationType(self):
+        """
+        Update the stacked widget to display the proper transformation type. Also runs checkRequirements() 
+        """
+        self.stackedWidget.setCurrentIndex( self.vb.determineTransformationType() )
+
+        self.checkRequirements()
     def checkRequirements(self):
         """
         To be run after changes have been made to the UI. It enables/disables the run button and display some messages.
@@ -93,75 +137,31 @@ class RasterBenderDialog(QWidget):
         # Checkin requirements
         self.runButton.setEnabled(False)
 
-        tbl = self.toBendLayer()
+        srcL = self.sourceRaster()
+        tarL = self.targetRaster()
         pl = self.pairsLayer()
 
-        if tbl is None:
-            self.displayMsg( "You must select a vector layer to bend !", True )
+        transType = self.vb.determineTransformationType()
+
+        if srcL is None:
+            self.displayMsg( "You must select a source raster !", True )
             return
-        if pl is None:
-            self.displayMsg( "You must select a vector (line) layer which defines the points pairs !", True )
+        if transType == 2 and tarL is None:
+            self.displayMsg( "You must select a target raster for a bending transformation !", True )
             return
-        if pl is tbl:
-            self.displayMsg( "The layer to bend must be different from the pairs layer !", True )
-            return            
-        if not tbl.isEditable():
-            self.displayMsg( "The layer to bend must be in edit mode !", True )
-            return
-        if not pl.isEditable() and self.pairsToPinsCheckBox.isChecked():
-            self.displayMsg( "The pairs layer must be in edit mode if you want to change pairs to pins !", True )
-            return
-        if self.stackedWidget.currentIndex() == 0:
+        if transType == 0:
             self.displayMsg("Impossible to run with an invalid transformation type.", True)
-            return            
-        self.displayMsg("Ready to go...")
+            return 
+
+        if srcL is tarL:
+            self.displayMsg("The source raster will be overwritten !", True)
+        else:        
+            self.displayMsg("Ready to go...")
         self.runButton.setEnabled(True)
 
-    def updateLayersComboboxes(self):
-        """
-        Recreate the comboboxes to display existing layers.
-        """
-        oldBendLayer = self.toBendLayer()
-        oldPairsLayer = self.pairsLayer()
-
-        self.comboBox_toBendLayer.clear()
-        self.comboBox_pairsLayer.clear()
-        for layer in self.iface.legendInterface().layers():
-            if layer.type() == QgsMapLayer.VectorLayer:
-                self.comboBox_toBendLayer.addItem( layer.name(), layer.id() )
-                if layer.geometryType() == QGis.Line :
-                    self.comboBox_pairsLayer.addItem( layer.name(), layer.id() )
-
-        if oldBendLayer is not None:
-            index = self.comboBox_toBendLayer.findData(oldBendLayer.id())
-            self.comboBox_toBendLayer.setCurrentIndex( index )
-        if oldPairsLayer is not None:
-            index = self.comboBox_pairsLayer.findData(oldPairsLayer.id())
-            self.comboBox_pairsLayer.setCurrentIndex( index )
-    def updateEditState_pairsLayer(self):
-        """
-        Update the edit state button for pairsLayer
-        """
-        l = self.pairsLayer()
-        self.editModeButton_pairsLayer.setChecked( False if (l is None or not l.isEditable()) else True )
-    def updateEditState_toBendLayer(self):
-        """
-        Update the edit state button for toBendLayer
-        """
-        l = self.toBendLayer()
-        self.editModeButton_toBendLayer.setChecked( False if (l is None or not l.isEditable()) else True )
-    def updateTransformationType(self):
-        """
-        Update the stacked widget to display the proper transformation type. Also runs checkRequirements() 
-        """
-        tt = self.vb.determineTransformationType()
-        self.stackedWidget.setCurrentIndex( tt )
-
-        self.checkRequirements()
-
     # Togglers
-    def toggleEditMode(self, checked, toBendLayer_True_pairsLayer_False):
-        l = self.toBendLayer() if toBendLayer_True_pairsLayer_False else self.pairsLayer()
+    def toggleEditMode(self, checked):
+        l = self.pairsLayer()
         if l is None:
             return 
 
@@ -177,10 +177,7 @@ class RasterBenderDialog(QWidget):
                     l.commitChanges()
                 elif retval == QMessageBox.Discard:
                     l.rollBack()
-    def toggleEditMode_toBendLayer(self, checked):
-        self.toggleEditMode(checked, True)
-    def toggleEditMode_pairsLayer(self, checked):
-        self.toggleEditMode(checked, False)
+        self.refreshStates()
 
     # Misc
     def createMemoryLayer(self):
@@ -200,10 +197,18 @@ class RasterBenderDialog(QWidget):
 
         self.updateLayersComboboxes()
 
-        index = self.comboBox_pairsLayer.findData(newMemoryLayer.id())
-        self.comboBox_pairsLayer.setCurrentIndex( index )
+        index = self.pairsLayerComboBox.findData(newMemoryLayer.id())
+        self.pairsLayerComboBox.setCurrentIndex( index )
         
-        newMemoryLayer.startEditing()  
+        newMemoryLayer.startEditing()
+        self.refreshStates()
+    def createTargetRaster(self):
+        """
+        Duplicates the source layer to be used as TargetLayer, and selects it in the ComboBox.
+        """
+        pass #todo
+
+
     def displayMsg(self, msg, error=False):
         if error:
             #QApplication.beep()
@@ -225,7 +230,7 @@ class RasterBenderDialog(QWidget):
 
         pairsLayer = self.pairsLayer()
 
-        transformer = BendTransformer( pairsLayer, self.restrictBox_pairsLayer.isChecked() ,self.bufferValue() )
+        transformer = BendTransformer( pairsLayer, self.pairsLayerRestrictToSelectionCheckBox.isChecked() ,self.bufferValue() )
 
         self.rubberBands[0].setColor(QColor(0,125,255))
         self.rubberBands[1].setColor(QColor(255,125,0))
@@ -263,6 +268,8 @@ class RasterBenderDialog(QWidget):
 
     # Events
     def eventFilter(self,object,event):
+        if QEvent is None:
+            return False # there's a strange bug where QEvent is sometimes None ?!
         if event.type() == QEvent.FocusIn:
             self.refreshStates()
         return False

@@ -162,14 +162,14 @@ class RasterBender:
 
 
         # Read the source data into numpy arrays
-        dsSource = gdal.Open("D:\Users\Olivier\Dropbox\Programmation\QGIS\Misc\RasterBender\\fg.12_clipped.tif", gdal.GA_ReadOnly ) 
+        dsSource = gdal.Open("D:\Users\Olivier\Dropbox\Programmation\QGIS\Misc\RasterBender\\fg.12_clipped_small.tif", gdal.GA_ReadOnly ) 
 
         sourceDataR = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1))
         sourceDataG = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2))
         sourceDataB = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3))
 
         # Open the target into numpy array
-        dsTarget = gdal.Open("D:\Users\Olivier\Dropbox\Programmation\QGIS\Misc\RasterBender\\fg.12_clipped_bent.tif", gdal.GA_Update )
+        dsTarget = gdal.Open("D:\Users\Olivier\Dropbox\Programmation\QGIS\Misc\RasterBender\\fg.12_clipped_small_bent.tif", gdal.GA_Update )
 
 
         targetDataR = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )

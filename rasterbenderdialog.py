@@ -261,7 +261,7 @@ class RasterBenderDialog(QWidget):
             self.rubberBands[0].addPoint( p, True, 0  )
 
         #draw the triangles
-        for i,tri in enumerate(transformer.delaunay.triangles):
+        for i,tri in enumerate(transformer.sourceDelaunay.triangles):
             self.rubberBands[2].addPoint( transformer.pointsA[tri[0]], False, i  )
             self.rubberBands[2].addPoint( transformer.pointsA[tri[1]], False, i  )
             self.rubberBands[2].addPoint( transformer.pointsA[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       

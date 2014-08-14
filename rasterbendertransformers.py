@@ -20,8 +20,8 @@ class Transformer():
 
         for feature in features:
             geom = feature.geometry().asPolyline()
-            self.pointsB.append( QgsPoint(geom[0].x(),geom[0].y()) )
-            self.pointsA.append( QgsPoint(geom[-1].x(),geom[-1].y()) )
+            self.pointsA.append( QgsPoint(geom[0].x(),geom[0].y()) )
+            self.pointsB.append( QgsPoint(geom[-1].x(),geom[-1].y()) )
 
     def map(self, p):
         return p
@@ -59,15 +59,15 @@ class BendTransformer(Transformer):
             return QgsPoint(p[0], p[1])
         else:
             # Triangle found : adapt it from the old mesh to the new mesh
-            a1 = self.pointsA[self.delaunay.triangles[triangle][0]]
-            a2 = self.pointsA[self.delaunay.triangles[triangle][1]]
-            a3 = self.pointsA[self.delaunay.triangles[triangle][2]]
+            a1 = self.pointsA[self.sourceDelaunay.triangles[triangle][0]]
+            a2 = self.pointsA[self.sourceDelaunay.triangles[triangle][1]]
+            a3 = self.pointsA[self.sourceDelaunay.triangles[triangle][2]]
 
-            b1 = self.pointsB[self.delaunay.triangles[triangle][0]]
-            b2 = self.pointsB[self.delaunay.triangles[triangle][1]]
-            b3 = self.pointsB[self.delaunay.triangles[triangle][2]]
+            b1 = self.pointsB[self.sourceDelaunay.triangles[triangle][0]]
+            b2 = self.pointsB[self.sourceDelaunay.triangles[triangle][1]]
+            b3 = self.pointsB[self.sourceDelaunay.triangles[triangle][2]]
 
-            mappedP = self.mapPointFromTriangleAtoTriangleB(p, a1, a2, a3, b1, b2, b3)
+            mappedP = self.mapPointFromTriangleAtoTriangleB(p, b1, b2, b3, a1, a2, a3)
 
             return mappedP
 

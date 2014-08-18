@@ -10,7 +10,7 @@
 
 [general]
 name=Raster Bender
-qgisMinimumVersion=2.2
+qgisMinimumVersion=2.4
 description=Does to vectors what georefencers does to raster. This feature is also known as "rubber sheeting".
 category=Vector
 version=0.1.1

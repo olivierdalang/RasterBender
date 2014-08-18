@@ -13,14 +13,14 @@ from rasterbendertransformers import *
 
 
 class RasterBenderDialog(QWidget):
-    def __init__(self, iface, vb):
+    def __init__(self, iface, rb):
         QWidget.__init__(self)
         uic.loadUi(os.path.join(os.path.dirname(__file__),'ui_main.ui'), self)
         self.setFocusPolicy(Qt.ClickFocus)
         #self.setWindowModality( Qt.ApplicationModal )
 
         self.iface = iface
-        self.vb = vb
+        self.rb = rb
 
         # Keeps three rubberbands for delaunay's peview
         self.rubberBands = None
@@ -30,15 +30,17 @@ class RasterBenderDialog(QWidget):
         self.previewButton.released.connect(self.hidePreview)
 
         self.createMemoryLayerButton.clicked.connect(self.createMemoryLayer)
-        self.createTargetRasterButton.clicked.connect(self.createTargetRaster)
 
         self.pairsLayerEditModeButton.clicked.connect( self.toggleEditMode )
 
-        self.runButton.clicked.connect(self.vb.run)
+        self.sourceRasterComboBox.activated.connect( self.loadSourcePath )
+        self.targetRasterComboBox.activated.connect( self.loadTargetPath )
+
+        self.runButton.clicked.connect(self.rb.run)
 
         # When those are changed, we refresh the states
-        self.sourceRasterComboBox.activated.connect( self.refreshStates )
-        self.targetRasterComboBox.activated.connect( self.refreshStates )
+        self.sourceRasterPathLineEdit.textChanged.connect( self.refreshStates )
+        self.targetRasterPathLineEdit.textChanged.connect( self.refreshStates )
         self.pairsLayerComboBox.activated.connect( self.refreshStates )
         self.pairsLayerRestrictToSelectionCheckBox.stateChanged.connect( self.refreshStates )
 
@@ -59,6 +61,16 @@ class RasterBenderDialog(QWidget):
         """
         layerId = self.targetRasterComboBox.itemData(self.targetRasterComboBox.currentIndex())
         return QgsMapLayerRegistry.instance().mapLayer(layerId)
+    def sourceRasterPath(self):
+        """
+        Returns the current source raster path
+        """
+        return self.sourceRasterPathLineEdit.text()
+    def targetRasterPath(self):
+        """
+        Returns the current target raster path
+        """
+        return self.targetRasterPathLineEdit.text()
     def pairsLayer(self):
         """
         Returns the current pairsLayer layer depending on what is choosen in the pairsLayerComboBox
@@ -70,6 +82,7 @@ class RasterBenderDialog(QWidget):
         Returns the current buffer value depending on the input in the spinbox
         """
         return self.bufferSpinBox.value()
+
 
     # Updaters
     def refreshStates(self):
@@ -93,13 +106,15 @@ class RasterBenderDialog(QWidget):
         """
         Recreate the comboboxes to display existing layers.
         """
-        oldSourceRaster = self.sourceRaster()
-        oldTargetRaster = self.targetRaster()
         oldPairsLayer = self.pairsLayer()
 
         self.sourceRasterComboBox.clear()
         self.targetRasterComboBox.clear()
         self.pairsLayerComboBox.clear()
+
+        self.sourceRasterComboBox.addItem( "- loaded rasters -" )
+        self.targetRasterComboBox.addItem( "- loaded rasters -" )
+
         for layer in self.iface.legendInterface().layers():
             if layer.type() == QgsMapLayer.VectorLayer:
                 if layer.geometryType() == QGis.Line :
@@ -108,12 +123,6 @@ class RasterBenderDialog(QWidget):
                 self.sourceRasterComboBox.addItem( layer.name(), layer.id() )
                 self.targetRasterComboBox.addItem( layer.name(), layer.id() )
 
-        if oldSourceRaster is not None:
-            index = self.sourceRasterComboBox.findData(oldSourceRaster.id())
-            self.sourceRasterComboBox.setCurrentIndex( index )
-        if oldTargetRaster is not None:
-            index = self.sourceRasterComboBox.findData(oldTargetRaster.id())
-            self.targetRasterComboBox.setCurrentIndex( index )
         if oldPairsLayer is not None:
             index = self.pairsLayerComboBox.findData(oldPairsLayer.id())
             self.pairsLayerComboBox.setCurrentIndex( index )
@@ -127,7 +136,7 @@ class RasterBenderDialog(QWidget):
         """
         Update the stacked widget to display the proper transformation type. Also runs checkRequirements() 
         """
-        self.stackedWidget.setCurrentIndex( self.vb.determineTransformationType() )
+        self.stackedWidget.setCurrentIndex( self.rb.determineTransformationType() )
 
         self.checkRequirements()
     def checkRequirements(self):
@@ -137,27 +146,34 @@ class RasterBenderDialog(QWidget):
         # Checkin requirements
         self.runButton.setEnabled(False)
 
-        srcL = self.sourceRaster()
-        tarL = self.targetRaster()
+        srcL = self.sourceRasterPath()
+        tarL = self.targetRasterPath()
         pl = self.pairsLayer()
 
-        transType = self.vb.determineTransformationType()
+        transType = self.rb.determineTransformationType()
 
-        if srcL is None:
-            self.displayMsg( "You must select a source raster !", True )
+        if not QFile(srcL).exists or not QgsRasterLayer.isValidRasterFileName(srcL):
+            self.displayMsg( "You must select a valid and existing source raster path !", True )
             return
-        if transType == 2 and tarL is None:
-            self.displayMsg( "You must select a target raster for a bending transformation !", True )
+        if transType == 3 and tarL=="":
+            self.displayMsg( "You must select a valid target raster path for a bending transformation !", True )
             return
         if transType == 0:
             self.displayMsg("Impossible to run with an invalid transformation type.", True)
             return 
-
-        if srcL is tarL:
+        if srcL == tarL:
             self.displayMsg("The source raster will be overwritten !", True)
         else:        
             self.displayMsg("Ready to go...")
         self.runButton.setEnabled(True)
+
+    # UI Setters
+    def loadSourcePath(self):
+        if self.sourceRaster() is not None:
+            self.sourceRasterPathLineEdit.setText( self.sourceRaster().dataProvider().dataSourceUri() )
+    def loadTargetPath(self):
+        if self.targetRaster() is not None:
+            self.targetRasterPathLineEdit.setText( self.targetRaster().dataProvider().dataSourceUri() )
 
     # Togglers
     def toggleEditMode(self, checked):
@@ -202,11 +218,7 @@ class RasterBenderDialog(QWidget):
         
         newMemoryLayer.startEditing()
         self.refreshStates()
-    def createTargetRaster(self):
-        """
-        Duplicates the source layer to be used as TargetLayer, and selects it in the ComboBox.
-        """
-        pass #todo
+    
 
 
     def displayMsg(self, msg, error=False):
@@ -219,31 +231,48 @@ class RasterBenderDialog(QWidget):
             self.rubberBands[0].reset(QGis.Polygon)
             self.rubberBands[1].reset(QGis.Polygon)
             self.rubberBands[2].reset(QGis.Polygon)
+            self.rubberBands[3].reset(QGis.Polygon)
             self.rubberBands = None
     def showPreview(self):
 
-        self.rubberBands = (QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon))
+        self.rubberBands = (QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
+                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
+                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
+                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon))
 
         self.rubberBands[0].reset(QGis.Polygon)
         self.rubberBands[1].reset(QGis.Polygon)
         self.rubberBands[2].reset(QGis.Polygon)
+        self.rubberBands[3].reset(QGis.Polygon)
 
         pairsLayer = self.pairsLayer()
 
         transformer = BendTransformer( pairsLayer, self.pairsLayerRestrictToSelectionCheckBox.isChecked() ,self.bufferValue() )
 
-        self.rubberBands[0].setColor(QColor(0,125,255))
-        self.rubberBands[1].setColor(QColor(255,125,0))
-        self.rubberBands[2].setColor(QColor(0,125,0,50))
+        self.rubberBands[0].setColor(QColor(220,220,255,175))
+        self.rubberBands[1].setColor(QColor(255,255,255,215))
+        self.rubberBands[2].setColor(QColor(255,0,0,50))
+        self.rubberBands[3].setColor(QColor(0,255,0,150))
 
-        self.rubberBands[0].setBrushStyle(Qt.Dense6Pattern)
-        self.rubberBands[1].setBrushStyle(Qt.Dense6Pattern)
+        self.rubberBands[0].setBrushStyle(Qt.SolidPattern)
+        self.rubberBands[1].setBrushStyle(Qt.SolidPattern)
         self.rubberBands[2].setBrushStyle(Qt.NoBrush)
+        self.rubberBands[3].setBrushStyle(Qt.NoBrush)
 
-        self.rubberBands[0].setWidth(3)
-        self.rubberBands[1].setWidth(3)
-        self.rubberBands[2].setWidth(1)
-      
+        self.rubberBands[2].setWidth(3)
+        self.rubberBands[3].setWidth(1)      
+
+        for i,tri in enumerate(transformer.delaunay):
+            #draw the source triangles
+            self.rubberBands[3].addPoint( transformer.pointsA[tri[0]], False, i  )
+            self.rubberBands[3].addPoint( transformer.pointsA[tri[1]], False, i  )
+            self.rubberBands[3].addPoint( transformer.pointsA[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+
+            #draw the target triangles
+            self.rubberBands[2].addPoint( transformer.pointsB[tri[0]], False, i  )
+            self.rubberBands[2].addPoint( transformer.pointsB[tri[1]], False, i  )
+            self.rubberBands[2].addPoint( transformer.pointsB[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+        
         #draw the expanded hull
         if transformer.expandedHull is not None:
             for p in transformer.expandedHull.asPolygon()[0]:
@@ -259,13 +288,6 @@ class RasterBenderDialog(QWidget):
         for p in transformer.hull.asPolygon()[0][0:1]:
             #we readd the first point since it's not possible to make true rings with rubberbands
             self.rubberBands[0].addPoint( p, True, 0  )
-
-        #draw the triangles
-        for i,tri in enumerate(transformer.sourceDelaunay.triangles):
-            self.rubberBands[2].addPoint( transformer.pointsA[tri[0]], False, i  )
-            self.rubberBands[2].addPoint( transformer.pointsA[tri[1]], False, i  )
-            self.rubberBands[2].addPoint( transformer.pointsA[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
-
     # Events
     def eventFilter(self,object,event):
         if QEvent is None:

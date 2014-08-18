@@ -29,23 +29,10 @@ from qgis.gui import *
 # Basic dependencies
 from osgeo import gdal  
 from osgeo import gdalnumeric
-import os.path
+import os.path, shutil
 import sys
 import math
 import numpy
-
-# More tricky dependencies
-from distutils.version import StrictVersion
-dependenciesStatus = 2 # 2: ok, 1: too old, 0: missing
-try:
-    import matplotlib.tri
-    minVersion = '1.3.0'
-    if StrictVersion(matplotlib.__version__) < StrictVersion(minVersion):
-        dependenciesStatus=1
-        QgsMessageLog.logMessage("Matplotlib version too old (%s instead of %s). You won't be able to use the bending algorithm" % (matplotlib.__version__,minVersion), 'RasterBender')
-except Exception, e:
-    QgsMessageLog.logMessage("Matplotlib is missing. You won't be able to use the bending algorithm", 'RasterBender')
-    dependenciesStatus = 0
 
 # Other classes
 from rasterbendertransformers import *
@@ -106,8 +93,7 @@ class RasterBender:
             0 if no pairs Found
             1 if one pair found => translation
             2 if two pairs found => linear
-            3 if three or more pairs found => bending
-            4 if bending but unmet dependencies"""
+            3 if three or more pairs found => bending"""
 
         pairsLayer = self.dlg.pairsLayer()
 
@@ -121,10 +107,7 @@ class RasterBender:
         elif featuresCount == 2:
             return 2
         elif featuresCount >= 3:
-            if dependenciesStatus != 2:
-                return 4
-            else:
-                return 3
+            return 3
 
         return 0
     
@@ -154,6 +137,7 @@ class RasterBender:
             self.dlg.displayMsg( "INVALID TRANSFORMATION TYPE - YOU SHOULDN'T HAVE BEEN ABLE TO HIT RUN" )
             return
 
+
         # Starting to through all target pixels
 
         #Open the dataset
@@ -162,15 +146,18 @@ class RasterBender:
 
 
         # Read the source data into numpy arrays
-        dsSource = gdal.Open("D:\Users\Olivier\Dropbox\Programmation\QGIS\Misc\RasterBender\\fg.12_clipped_small.tif", gdal.GA_ReadOnly ) 
+        dsSource = gdal.Open( self.dlg.sourceRasterPath(), gdal.GA_ReadOnly ) 
+
 
         sourceDataR = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1))
         sourceDataG = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2))
         sourceDataB = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3))
 
         # Open the target into numpy array
-        dsTarget = gdal.Open("D:\Users\Olivier\Dropbox\Programmation\QGIS\Misc\RasterBender\\fg.12_clipped_small_bent.tif", gdal.GA_Update )
+        if not QFile(self.dlg.targetRasterPath()).exists():
+            shutil.copy( self.dlg.sourceRasterPath(), self.dlg.targetRasterPath() ) # if the target doesn't exist, we use the source target
 
+        dsTarget = gdal.Open(self.dlg.targetRasterPath(), gdal.GA_Update )
 
         targetDataR = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )
         targetDataG = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )
@@ -196,12 +183,6 @@ class RasterBender:
             return ( int((qgspoint.x() - offX) / mapW * pixW ) , int((qgspoint.y() - offY) / mapH * pixH ) )
 
 
-        #def xyToQgsPoint(x, y):
-        #    return QgsPoint( offX + mapW * (x/pixW), offY + mapH * (1.0-y/pixH) )
-        #def qgsPointToXY(qgspoint):
-        #    return ( int((qgspoint.x() - offX) / mapW * pixW ) , int( - ((qgspoint.y() - offY) / mapH - 1.0 ) * pixH ) )
-
-
         for y in range(0, dsTarget.RasterYSize):
             for x in range(0, dsTarget.RasterXSize):
 
@@ -213,6 +194,12 @@ class RasterBender:
 
                 newX, newY = qgsPointToXY(  self.transformer.map( xyToQgsPoint(x,y) )  )
 
+                #ident = sourceRaster.dataProvider().identify( pt, QgsRaster.IdentifyFormatValue)
+
+                #targetDataR[y][x] = ident.results()[1]
+                #targetDataG[y][x] = ident.results()[2]
+                #targetDataB[y][x] = ident.results()[3]
+
                 try:
                     targetDataR[y][x] = sourceDataR[newY][newX]
                     targetDataG[y][x] = sourceDataG[newY][newX]
@@ -222,147 +209,14 @@ class RasterBender:
                     targetDataG[y][x] = 0
                     targetDataB[y][x] = 0
 
-                #px = extent.xMinimum() + extent.width() * x / float( targetRaster.width()-1 )
-                #py = extent.yMinimum() + extent.height() * y / float( targetRaster.height()-1 )
-                #pt = QgsPoint( px, py )
-
-                #ident = sourceRaster.dataProvider().identify( pt, QgsRaster.IdentifyFormatValue)
-
-                #targetDataR[y][x] = ident.results()[1]
-                #targetDataG[y][x] = ident.results()[2]
-                #targetDataB[y][x] = ident.results()[3]
-
-
         self.dlg.progressBar.setValue( 0 )
         self.dlg.displayMsg( "Writing to file..." )
-
 
         gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(1), targetDataR)  
         gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(2), targetDataG)  
         gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(3), targetDataB)
 
-
-
         self.dlg.progressBar.setValue( 100 )
         self.dlg.displayMsg( "Done !" )
 
-        return
-
-        features = toBendLayer.getFeatures() if not self.dlg.restrictBox_toBendLayer.isChecked() else toBendLayer.selectedFeatures()
-
-        displayCount = toBendLayer.pendingFeatureCount() if not self.dlg.restrictBox_toBendLayer.isChecked() else len(features)
-        self.dlg.displayMsg( "Starting to iterate through %i features..." % displayCount )
-        QCoreApplication.processEvents()
-
-        toBendLayer.beginEditCommand("Feature bending")
-        for i,feature in enumerate(features):
-
-            self.dlg.progressBar.setValue( int(100.0*float(i)/float(displayCount)) )
-            self.dlg.displayMsg( "Aligning features %i out of %i..."  % (i, displayCount))
-            QCoreApplication.processEvents()
-
-            geom = feature.geometry()
-
-            #TODO : this cood be much simple if we could iterate through to vertices and use QgsGeometry.moveVertex(x,y,index), but QgsGeometry.vertexAt(index) doesn't tell wether the index exists, so there's no clean way to iterate...
-
-            if geom.type() == QGis.Point:
-
-                if not geom.isMultipart():
-                    # SINGLE PART POINT
-                    p = geom.asPoint()
-                    newGeom = QgsGeometry.fromPoint( self.transformer.map(p) )
-
-                else:
-                    # MULTI PART POINT
-                    listA = geom.asMultiPoint()
-                    newListA = []
-                    for p in listA:
-                        newListA.append( self.transformer.map(p) )
-                    newGeom = QgsGeometry.fromMultiPoint( newListA )
-
-            elif geom.type() == QGis.Line:
-
-                if not geom.isMultipart():
-                    # SINGLE PART LINESTRING
-                    listA = geom.asPolyline()
-                    newListA = []
-                    for p in listA:
-                        newListA.append( self.transformer.map(p) )
-                    newGeom = QgsGeometry.fromPolyline( newListA )
-
-                else:
-                    # MULTI PART LINESTRING
-                    listA = geom.asMultiPolyline()
-                    newListA = []
-                    for listB in listA:
-                        newListB = []
-                        for p in listB:
-                            newListB.append( self.transformer.map(p) )
-                        newListA.append( newListB )
-                    newGeom = QgsGeometry.fromMultiPolyline( newListA )
-
-            elif geom.type() == QGis.Polygon:
-
-                if not geom.isMultipart():
-                    # SINGLE PART POLYGON
-                    listA = geom.asPolygon()
-                    newListA = []
-                    for listB in listA:
-                        newListB = []
-                        for p in listB:
-                            newListB.append( self.transformer.map(p) )
-                        newListA.append( newListB )
-                    newGeom = QgsGeometry.fromPolygon( newListA )
-
-                else:
-                    # MULTI PART POLYGON
-                    listA = geom.asMultiPolygon()
-                    newListA = []
-                    for listB in listA:
-                        newListB = []
-                        for listC in listB:
-                            newListC = []
-                            for p in listC:
-                                newListC.append( self.transformer.map(p) )
-                            newListB.append( newListC )
-                        newListA.append( newListB )
-                    newGeom = QgsGeometry.fromMultiPolygon( newListA )
-
-            else:
-                # FALLBACK, JUST IN CASE ;)
-                newGeom = geom
-
-            toBendLayer.changeGeometry( feature.id(), newGeom )
-
-        toBendLayer.endEditCommand()
-        toBendLayer.repaintRequested.emit()
-
-
-        #Transforming pairs to pins
-        if self.dlg.pairsToPinsCheckBox.isChecked():
-
-            features = pairsLayer.getFeatures() if not self.dlg.pairsLayerRestrictToSelectionCheckBox.isChecked() else pairsLayer.selectedFeatures()
-
-            displayCount = pairsLayer.pendingFeatureCount() if not self.dlg.pairsLayerRestrictToSelectionCheckBox.isChecked() else len(features)
-            self.dlg.progressBar.setValue( 0 )
-            self.dlg.displayMsg( "Starting to transform %i pairs to pins..." % displayCount )
-            QCoreApplication.processEvents()
-
-            pairsLayer.beginEditCommand("Transforming pairs to pins")
-            for i,feature in enumerate(features):
-
-                self.dlg.progressBar.setValue( int(100.0*float(i)/float(displayCount)) )
-                self.dlg.displayMsg( "Transforming pair to pin %i out of %i..."  % (i, displayCount))
-                QCoreApplication.processEvents()
-
-                geom = feature.geometry().asPolyline()
-
-                newGeom = QgsGeometry.fromPolyline( [geom[-1],geom[-1]] )
-                pairsLayer.changeGeometry( feature.id(), newGeom )
-
-            pairsLayer.endEditCommand()
-
-        self.dlg.displayMsg( "Finished !" )
-        self.dlg.progressBar.setValue( 100 )
-        pairsLayer.repaintRequested.emit()
 

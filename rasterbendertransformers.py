@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
 from qgis.core import *
 import math
-
-try:
-    #we silently fail the import here since message is already taken car in rasterbender.py
-    import matplotlib.tri
-except Exception, e:
-    pass
+import algorithm_voronoi as voronoi # it seems we can't import fTools' voronoi directly, so we ship a copy of the file
+import algorithm_trifinder as trifinder
 
 class Transformer():
     """
@@ -39,33 +35,40 @@ class BendTransformer(Transformer):
 
         # If there is a buffer, we add a ring outside the hull so that the transformation smoothly stops
         if buff>0:
-            self.expandedHull = self.hull.buffer(buff, 3)
-            for p in self.expandedHull.asPolygon()[0]:
+            self.expandedHull = self.hull.buffer(buff, 2)
+            for p in self.expandedHull.asPolygon()[0][:-1]: #we don't take the last point since it's a duplicate
                 self.pointsA.append( p )
                 self.pointsB.append( p )
         else:
             self.expandedHull = None
 
-        # We compute the delaunay        
-        self.delaunay = matplotlib.tri.Triangulation([p.x() for p in self.pointsA],[p.y() for p in self.pointsA])
-        self.trifinder = self.delaunay.get_trifinder()
+        # We compute the delaunay
+
+        # We need an array of voronoi.Site
+        sitesA = [ voronoi.Site( p.x(), p.y() ) for p in self.pointsA ]
+        sitesB = [ voronoi.Site( p.x(), p.y() ) for p in self.pointsB ]
+
+        self.delaunay = voronoi.computeDelaunayTriangulation( sitesA )
+        self.trifinder = trifinder.Trifinder( sitesB, self.delaunay )
+
+
 
     def map(self, p):
 
-        triangle = self.trifinder( p[0], p[1] )
+        triangle = self.trifinder.find( voronoi.Site(p[0], p[1]) )
 
-        if triangle==-1:
+        if triangle is None:
             # No triangle found : don't change the point
             return QgsPoint(p[0], p[1])
         else:
             # Triangle found : adapt it from the old mesh to the new mesh
-            a1 = self.pointsA[self.sourceDelaunay.triangles[triangle][0]]
-            a2 = self.pointsA[self.sourceDelaunay.triangles[triangle][1]]
-            a3 = self.pointsA[self.sourceDelaunay.triangles[triangle][2]]
+            a1 = self.pointsA[self.delaunay[triangle][0]]
+            a2 = self.pointsA[self.delaunay[triangle][1]]
+            a3 = self.pointsA[self.delaunay[triangle][2]]
 
-            b1 = self.pointsB[self.sourceDelaunay.triangles[triangle][0]]
-            b2 = self.pointsB[self.sourceDelaunay.triangles[triangle][1]]
-            b3 = self.pointsB[self.sourceDelaunay.triangles[triangle][2]]
+            b1 = self.pointsB[self.delaunay[triangle][0]]
+            b2 = self.pointsB[self.delaunay[triangle][1]]
+            b3 = self.pointsB[self.delaunay[triangle][2]]
 
             mappedP = self.mapPointFromTriangleAtoTriangleB(p, b1, b2, b3, a1, a2, a3)
 

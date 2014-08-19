@@ -9,7 +9,9 @@ from qgis.gui import *
 
 import os.path
 
+# Other classes
 from rasterbendertransformers import *
+from rasterbenderworkerthread import RasterBenderWorkerThread
 
 
 class RasterBenderDialog(QWidget):
@@ -21,6 +23,8 @@ class RasterBenderDialog(QWidget):
 
         self.iface = iface
         self.rb = rb
+        self.worker = None
+        self.workerThread = None
 
         # Keeps three rubberbands for delaunay's peview
         self.rubberBands = None
@@ -78,26 +82,63 @@ class RasterBenderDialog(QWidget):
         """
         layerId = self.pairsLayerComboBox.itemData(self.pairsLayerComboBox.currentIndex())
         return QgsMapLayerRegistry.instance().mapLayer(layerId)
+    def restrictToSelection(self):
+        """
+        Returns the current restrict to selection depending on the input in the checkbox
+        """
+        return self.pairsLayerRestrictToSelectionCheckBox.isChecked()
     def bufferValue(self):
         """
         Returns the current buffer value depending on the input in the spinbox
         """
         return self.bufferSpinBox.value()
 
+    # Thread management
     def run(self):
-        self.runButton.setEnabled(False)
-        self.abortButton.setEnabled(True)
-        self.rb.run()
+        self.endThread()
+
+        if self.worker is None or not self.worker.isRunning():
+
+            self.runButton.setEnabled(False)
+            self.abortButton.setEnabled(True)
+
+            self.workerThread = RasterBenderWorkerThread( self.determineTransformationType(), self.pairsLayer(), self.restrictToSelection(), self.bufferValue(), self.sourceRasterPath(), self.targetRasterPath() )
+
+            self.workerThread.finished.connect( self.finish )
+            self.workerThread.error.connect( self.error )
+            self.workerThread.progress.connect( self.progress )
+
+            self.workerThread.start()
+
     def abort(self):
+        if self.workerThread is not None:
+            self.workerThread.abort()
+    def endThread(self):
+        if self.workerThread is not None:
+            self.workerThread.quit()
+            self.workerThread.wait()
+            self.workerThread.deleteLater()
+            self.workerThread = None
+
+
+    # Thread slots
+    def progress(self, string, progPixel, progBlock):
+        self.pixelProgressBar.setValue( int(progPixel*100) )
+        self.blockProgressBar.setValue( int(progBlock*100) )
+        self.displayMsg( string )    
+    def error(self, string):
+        self.displayMsg( string, true )
         self.runButton.setEnabled(True)
         self.abortButton.setEnabled(False)
-        self.rb.abort()
-    def finish(self):
+        self.endThread()
+    def finish():
         self.displayMsg( "Done !" )
         self.blockProgressBar.setValue( 100 )
         self.pixelProgressBar.setValue( 100 )
         self.runButton.setEnabled(True)
         self.abortButton.setEnabled(False)
+        self.endThread()
+
 
 
     # Updaters
@@ -152,7 +193,7 @@ class RasterBenderDialog(QWidget):
         """
         Update the stacked widget to display the proper transformation type. Also runs checkRequirements() 
         """
-        self.stackedWidget.setCurrentIndex( self.rb.determineTransformationType() )
+        self.stackedWidget.setCurrentIndex( self.determineTransformationType() )
 
         self.checkRequirements()
     def checkRequirements(self):
@@ -166,7 +207,7 @@ class RasterBenderDialog(QWidget):
         tarL = self.targetRasterPath()
         pl = self.pairsLayer()
 
-        transType = self.rb.determineTransformationType()
+        transType = self.determineTransformationType()
 
         if not QFile(srcL).exists or not QgsRasterLayer.isValidRasterFileName(srcL):
             self.displayMsg( "You must select a valid and existing source raster path !", True )
@@ -234,7 +275,28 @@ class RasterBenderDialog(QWidget):
         
         newMemoryLayer.startEditing()
         self.refreshStates()
-    
+    def determineTransformationType(self):
+        """Returns :
+            0 if no pairs Found
+            1 if one pair found => translation
+            2 if two pairs found => linear
+            3 if three or more pairs found => bending"""
+
+        pairsLayer = self.pairsLayer()
+
+        if pairsLayer is None:
+            return 0
+
+        featuresCount = len(pairsLayer.selectedFeaturesIds()) if self.restrictToSelection() else len(pairsLayer.allFeatureIds())
+        
+        if featuresCount == 1:
+            return 1
+        elif featuresCount == 2:
+            return 2
+        elif featuresCount >= 3:
+            return 3
+
+        return 0
 
 
     def displayMsg(self, msg, error=False):

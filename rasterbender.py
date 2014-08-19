@@ -179,15 +179,16 @@ class RasterBender:
             return ( int((qgspoint.x() - offX) / mapW * pixW ) , int((qgspoint.y() - offY) / mapH * pixH ) )
 
 
-        displayTotal = dsTarget.RasterXSize*dsTarget.RasterYSize
-        displayStep = min(displayTotal/100,5000) # update gui every n steps
 
         #Loop through every block
-        blockSize = 500
+        blockSize = 100
         blockCountX = dsTarget.RasterXSize/blockSize
         blockCountY = dsTarget.RasterYSize/blockSize
         blockCount = blockCountX*blockCountY
         blockI = 0
+
+        displayTotal = dsTarget.RasterXSize*dsTarget.RasterYSize
+        displayStep = min(blockCount/10,5000) # update gui every n steps
 
         self.dlg.displayMsg( "Starting computation... %i points to compute !! This can take a while..."  % (displayTotal))
         QCoreApplication.processEvents()
@@ -205,6 +206,13 @@ class RasterBender:
                 blockI += 1
                 pixelCount = blockW*blockH
                 pixelI = 0
+
+                # We check if the block intersects the hull, if not, we skip it
+                hull = self.transformer.expandedHull if self.transformer.expandedHull is not None else self.transformer.hull
+                if not hull.intersects( QgsRectangle( xyToQgsPoint(blockOffsetX, blockOffsetY), xyToQgsPoint(blockOffsetX+blockW, blockOffsetY+blockH) ) ):
+                    self.dlg.displayMsg( "Block %i out of %i is out of the convex hull, we skip it..."  % (blockI, blockCount ))
+                    QCoreApplication.processEvents()
+                    continue
 
                 targetDataR = numpy.ndarray( (blockH, blockW) )
                 targetDataG = numpy.ndarray( (blockH, blockW) )

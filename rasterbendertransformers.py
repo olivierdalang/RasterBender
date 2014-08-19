@@ -61,7 +61,7 @@ class BendTransformer(Transformer):
             # No triangle found : don't change the point
             return QgsPoint(p[0], p[1])
         else:
-            # Triangle found : adapt it from the old mesh to the new mesh
+            # Triangle found : adapt it from the new mesh to the old mesh
             a1 = self.pointsA[self.delaunay[triangle][0]]
             a2 = self.pointsA[self.delaunay[triangle][1]]
             a3 = self.pointsA[self.delaunay[triangle][2]]

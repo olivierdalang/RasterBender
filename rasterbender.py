@@ -45,6 +45,8 @@ class RasterBender:
         self.iface = iface
         self.dlg = RasterBenderDialog(iface,self)
 
+        self._abort = False
+
         self.ptsA = []
         self.ptsB = []
 
@@ -110,10 +112,15 @@ class RasterBender:
             return 3
 
         return 0
+
+    def abort(self):
+        self._abort = True
     
     def run(self):
+        self._abort = False
 
-        self.dlg.progressBar.setValue( 0 )
+        self.dlg.pixelProgressBar.setValue( 0 )
+        self.dlg.blockProgressBar.setValue( 0 )
 
         #targetRaster = self.dlg.targetRaster()
         #sourceRaster = self.dlg.sourceRaster()
@@ -143,11 +150,8 @@ class RasterBender:
         #Open the dataset
         gdal.UseExceptions()
 
-
-
         # Read the source data into numpy arrays
-        dsSource = gdal.Open( self.dlg.sourceRasterPath(), gdal.GA_ReadOnly ) 
-
+        dsSource = gdal.Open( self.dlg.sourceRasterPath(), gdal.GA_ReadOnly )
 
         sourceDataR = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1))
         sourceDataG = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2))
@@ -159,23 +163,15 @@ class RasterBender:
 
         dsTarget = gdal.Open(self.dlg.targetRasterPath(), gdal.GA_Update )
 
-        targetDataR = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )
-        targetDataG = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )
-        targetDataB = numpy.ndarray( (dsTarget.RasterYSize, dsTarget.RasterXSize) )
+        # Get the transformation
+        pixW = float(dsTarget.RasterXSize-1) #width in pixel
+        pixH = float(dsTarget.RasterYSize-1) #width in pixel
+        mapW = float(dsTarget.RasterXSize)*dsTarget.GetGeoTransform()[1] #width in map units
+        mapH = float(dsTarget.RasterYSize)*dsTarget.GetGeoTransform()[5] #width in map units
+        offX = dsTarget.GetGeoTransform()[0] #offset in map units
+        offY = dsTarget.GetGeoTransform()[3] #offset in map units
 
-        # Loop through every pixel
 
-        displayTotal = dsTarget.RasterXSize*dsTarget.RasterYSize
-        displayStep = int(displayTotal/100)
-        displayCount = 0
-
-        
-        pixW = float(dsTarget.RasterXSize-1)
-        pixH = float(dsTarget.RasterYSize-1)
-        mapW = float(dsTarget.RasterXSize)*dsTarget.GetGeoTransform()[1]
-        mapH = float(dsTarget.RasterYSize)*dsTarget.GetGeoTransform()[5]
-        offX = dsTarget.GetGeoTransform()[0]
-        offY = dsTarget.GetGeoTransform()[3]
 
         def xyToQgsPoint(x, y):
             return QgsPoint( offX + mapW * (x/pixW), offY + mapH * (y/pixH) )
@@ -183,40 +179,78 @@ class RasterBender:
             return ( int((qgspoint.x() - offX) / mapW * pixW ) , int((qgspoint.y() - offY) / mapH * pixH ) )
 
 
-        for y in range(0, dsTarget.RasterYSize):
-            for x in range(0, dsTarget.RasterXSize):
+        displayTotal = dsTarget.RasterXSize*dsTarget.RasterYSize
+        displayStep = min(displayTotal/100,5000) # update gui every n steps
 
-                displayCount+=1
-                if displayCount%displayStep == 0:
-                    self.dlg.progressBar.setValue( int(100.0*float(displayCount)/float(displayTotal)) )
-                    self.dlg.displayMsg( "Working on pixel %i out of %i..."  % (displayCount, displayTotal))
-                    QCoreApplication.processEvents()
+        #Loop through every block
+        blockSize = 500
+        blockCountX = dsTarget.RasterXSize/blockSize
+        blockCountY = dsTarget.RasterYSize/blockSize
+        blockCount = blockCountX*blockCountY
+        blockI = 0
 
-                newX, newY = qgsPointToXY(  self.transformer.map( xyToQgsPoint(x,y) )  )
+        self.dlg.displayMsg( "Starting computation... %i points to compute !! This can take a while..."  % (displayTotal))
+        QCoreApplication.processEvents()
 
-                #ident = sourceRaster.dataProvider().identify( pt, QgsRaster.IdentifyFormatValue)
+        for blockNumY in range(0, blockCountX+1 ):
+            blockOffsetY = blockNumY*blockSize
+            blockH = min( blockSize, dsTarget.RasterYSize-blockOffsetY )
+            if blockH == 0: continue
 
-                #targetDataR[y][x] = ident.results()[1]
-                #targetDataG[y][x] = ident.results()[2]
-                #targetDataB[y][x] = ident.results()[3]
+            for blockNumX in range(0, blockCountY+1 ):
+                blockOffsetX = blockNumX*blockSize
+                blockW = min( blockSize, dsTarget.RasterXSize-blockOffsetX )
+                if blockW == 0: continue
 
-                try:
-                    targetDataR[y][x] = sourceDataR[newY][newX]
-                    targetDataG[y][x] = sourceDataG[newY][newX]
-                    targetDataB[y][x] = sourceDataB[newY][newX]
-                except IndexError, e:
-                    targetDataR[y][x] = 0
-                    targetDataG[y][x] = 0
-                    targetDataB[y][x] = 0
+                blockI += 1
+                pixelCount = blockW*blockH
+                pixelI = 0
 
-        self.dlg.progressBar.setValue( 0 )
-        self.dlg.displayMsg( "Writing to file..." )
+                targetDataR = numpy.ndarray( (blockH, blockW) )
+                targetDataG = numpy.ndarray( (blockH, blockW) )
+                targetDataB = numpy.ndarray( (blockH, blockW) )
 
-        gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(1), targetDataR)  
-        gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(2), targetDataG)  
-        gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(3), targetDataB)
+                # Loop through every pixel
+                for y in range(0, blockH):
+                    for x in range(0, blockW):
 
-        self.dlg.progressBar.setValue( 100 )
-        self.dlg.displayMsg( "Done !" )
+                        if self._abort:
+                            self.dlg.displayMsg( "Aborted on pixel %i out of %i on block %i out of %i..."  % (pixelI, pixelCount, blockI, blockCount ), True)
+                            QCoreApplication.processEvents()
+                            return
+
+
+                        pixelI+=1
+                        if pixelI%displayStep == 0:
+                            self.dlg.pixelProgressBar.setValue( int(100.0*float(pixelI)/float(pixelCount)) )
+                            self.dlg.blockProgressBar.setValue( int(100.0*float(blockI)/float(blockCount)) )
+                            self.dlg.displayMsg( "Working on pixel %i out of %i on block %i out of %i..."  % (pixelI, pixelCount, blockI, blockCount ))
+                            QCoreApplication.processEvents()
+
+                        newX, newY = qgsPointToXY(  self.transformer.map( xyToQgsPoint(blockOffsetX+x,blockOffsetY+y) )  )
+
+                        #ident = sourceRaster.dataProvider().identify( pt, QgsRaster.IdentifyFormatValue)
+
+                        #targetDataR[y][x] = ident.results()[1]
+                        #targetDataG[y][x] = ident.results()[2]
+                        #targetDataB[y][x] = ident.results()[3]
+
+                        try:
+                            if newY<0 or newX<0: #avoid looping
+                                raise IndexError()
+                            targetDataR[y][x] = sourceDataR[newY][newX]
+                            targetDataG[y][x] = sourceDataG[newY][newX]
+                            targetDataB[y][x] = sourceDataB[newY][newX]
+                        except IndexError, e:
+                            targetDataR[y][x] = 0
+                            targetDataG[y][x] = 0
+                            targetDataB[y][x] = 0
+
+
+                gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(1), targetDataR, blockOffsetX, blockOffsetY)  
+                gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(2), targetDataG, blockOffsetX, blockOffsetY)  
+                gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(3), targetDataB, blockOffsetX, blockOffsetY)
+
+        self.dlg.finish()
 
 

@@ -36,7 +36,8 @@ class RasterBenderDialog(QWidget):
         self.sourceRasterComboBox.activated.connect( self.loadSourcePath )
         self.targetRasterComboBox.activated.connect( self.loadTargetPath )
 
-        self.runButton.clicked.connect(self.rb.run)
+        self.runButton.clicked.connect(self.run)
+        self.abortButton.clicked.connect(self.abort)
 
         # When those are changed, we refresh the states
         self.sourceRasterPathLineEdit.textChanged.connect( self.refreshStates )
@@ -82,6 +83,21 @@ class RasterBenderDialog(QWidget):
         Returns the current buffer value depending on the input in the spinbox
         """
         return self.bufferSpinBox.value()
+
+    def run(self):
+        self.runButton.setEnabled(False)
+        self.abortButton.setEnabled(True)
+        self.rb.run()
+    def abort(self):
+        self.runButton.setEnabled(True)
+        self.abortButton.setEnabled(False)
+        self.rb.abort()
+    def finish(self):
+        self.displayMsg( "Done !" )
+        self.blockProgressBar.setValue( 100 )
+        self.pixelProgressBar.setValue( 100 )
+        self.runButton.setEnabled(True)
+        self.abortButton.setEnabled(False)
 
 
     # Updaters

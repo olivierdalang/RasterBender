@@ -19,6 +19,7 @@ class Trifinder(object):
 
     def find(self, site):
 
+        #we start by searching the last triangle since it's very possible that it's the same
         if self.lastIndex is not None:
             lastTri = self.triangles[ self.lastIndex ]
             if Trifinder.pointInTriangle( site, self.sites[lastTri[0]], self.sites[lastTri[1]], self.sites[lastTri[2]] ):

@@ -127,11 +127,11 @@ class RasterBenderDialog(QWidget):
         self.blockProgressBar.setValue( int(progBlock*100) )
         self.displayMsg( string )    
     def error(self, string):
-        self.displayMsg( string, true )
+        self.displayMsg( string, True )
         self.runButton.setEnabled(True)
         self.abortButton.setEnabled(False)
         self.endThread()
-    def finish():
+    def finish(self):
         self.displayMsg( "Done !" )
         self.blockProgressBar.setValue( 100 )
         self.pixelProgressBar.setValue( 100 )

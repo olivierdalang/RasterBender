@@ -102,7 +102,7 @@ class RasterBenderDialog(QWidget):
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 
-            self.workerThread = RasterBenderWorkerThread( self.determineTransformationType(), self.pairsLayer(), self.restrictToSelection(), self.bufferValue(), self.sourceRasterPath(), self.targetRasterPath() )
+            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.restrictToSelection(), self.bufferValue(), self.sourceRasterPath(), self.targetRasterPath() )
 
             self.workerThread.finished.connect( self.finish )
             self.workerThread.error.connect( self.error )
@@ -153,9 +153,6 @@ class RasterBenderDialog(QWidget):
         # Update the edit mode buttons
         self.updateEditState_pairsLayer()
 
-        # Update the transformation type
-        self.updateTransformationType()
-
         # Chech the requirements
         self.checkRequirements()
 
@@ -189,13 +186,7 @@ class RasterBenderDialog(QWidget):
         """
         l = self.pairsLayer()
         self.pairsLayerEditModeButton.setChecked( False if (l is None or not l.isEditable()) else True )
-    def updateTransformationType(self):
-        """
-        Update the stacked widget to display the proper transformation type. Also runs checkRequirements() 
-        """
-        self.stackedWidget.setCurrentIndex( self.determineTransformationType() )
-
-        self.checkRequirements()
+    
     def checkRequirements(self):
         """
         To be run after changes have been made to the UI. It enables/disables the run button and display some messages.
@@ -205,19 +196,23 @@ class RasterBenderDialog(QWidget):
 
         srcL = self.sourceRasterPath()
         tarL = self.targetRasterPath()
-        pl = self.pairsLayer()
-
-        transType = self.determineTransformationType()
+        pL = self.pairsLayer()
 
         if not QFile(srcL).exists or not QgsRasterLayer.isValidRasterFileName(srcL):
             self.displayMsg( "You must select a valid and existing source raster path !", True )
             return
-        if transType == 3 and tarL=="":
-            self.displayMsg( "You must select a valid target raster path for a bending transformation !", True )
+        if tarL=="":
+            self.displayMsg( "You must select a valid target raster path !", True )
             return
-        if transType == 0:
-            self.displayMsg("Impossible to run with an invalid transformation type.", True)
-            return 
+        if pL is None:
+            self.displayMsg( "You must define a pairs layer.", True)
+            return
+        if len(pL.allFeatureIds()) < 3:
+            self.displayMsg( "The pairs layers must have at least 3 pairs.", True)
+            return
+        if self.restrictToSelection() and len(pL.selectedFeaturesIds()) < 3:
+            self.displayMsg( "You must select at least 3 pairs.", True)
+            return
         if srcL == tarL:
             self.displayMsg("The source raster will be overwritten !", True)
         else:        
@@ -275,28 +270,7 @@ class RasterBenderDialog(QWidget):
         
         newMemoryLayer.startEditing()
         self.refreshStates()
-    def determineTransformationType(self):
-        """Returns :
-            0 if no pairs Found
-            1 if one pair found => translation
-            2 if two pairs found => linear
-            3 if three or more pairs found => bending"""
-
-        pairsLayer = self.pairsLayer()
-
-        if pairsLayer is None:
-            return 0
-
-        featuresCount = len(pairsLayer.selectedFeaturesIds()) if self.restrictToSelection() else len(pairsLayer.allFeatureIds())
-        
-        if featuresCount == 1:
-            return 1
-        elif featuresCount == 2:
-            return 2
-        elif featuresCount >= 3:
-            return 3
-
-        return 0
+    
 
 
     def displayMsg(self, msg, error=False):

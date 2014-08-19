@@ -44,10 +44,9 @@ class RasterBenderWorkerThread(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str, float, float) #message, pixel progress, block progress
 
-    def __init__(self, transType, pairsLayer, limitToSelection, bufferValue, sourcePath, targetPath):
+    def __init__(self, pairsLayer, limitToSelection, bufferValue, sourcePath, targetPath):
         QThread.__init__(self)
 
-        self.transType = transType
         self.pairsLayer = pairsLayer
         self.limitToSelection = limitToSelection
         self.bufferValue = bufferValue
@@ -69,21 +68,8 @@ class RasterBenderWorkerThread(QThread):
 
         self.progress.emit("Starting RasterBender", 0.0, 0.0)
 
-
-        # Loading the delaunay
-        if self.transType==3:
-            self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )            
-            self.transformer = BendTransformer( self.pairsLayer, self.limitToSelection, self.bufferValue )
-        elif self.transType==2:
-            self.progress.emit( "Loading linear transformation vectors...", 0.0, 0.0  )
-            self.transformer = LinearTransformer( self.pairsLayer, self.limitToSelection )
-        elif self.transType==1:
-            self.progress.emit( "Loading translation vector...", 0.0, 0.0  )
-            self.transformer = TranslationTransformer( self.pairsLayer, self.limitToSelection )
-        else:
-            self.error.emit( "INVALID TRANSFORMATION TYPE" )
-            return
-
+        self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )            
+        self.transformer = BendTransformer( self.pairsLayer, self.limitToSelection, self.bufferValue )
 
         # Starting to through all target pixels
 
@@ -122,8 +108,8 @@ class RasterBenderWorkerThread(QThread):
 
         #Loop through every block
         blockSize = 100
-        blockCountX = dsTarget.RasterXSize/blockSize
-        blockCountY = dsTarget.RasterYSize/blockSize
+        blockCountX = dsTarget.RasterXSize//blockSize+1
+        blockCountY = dsTarget.RasterYSize//blockSize+1
         blockCount = blockCountX*blockCountY
         blockI = 0
 
@@ -133,12 +119,12 @@ class RasterBenderWorkerThread(QThread):
         self.progress.emit( "Starting computation... %i points to compute !! This can take a while..."  % (displayTotal), 0.0, 0.0)
         
 
-        for blockNumY in range(0, blockCountX+1 ):
+        for blockNumY in range(0, blockCountX ):
             blockOffsetY = blockNumY*blockSize
             blockH = min( blockSize, dsTarget.RasterYSize-blockOffsetY )
             if blockH == 0: continue
 
-            for blockNumX in range(0, blockCountY+1 ):
+            for blockNumX in range(0, blockCountY ):
                 blockOffsetX = blockNumX*blockSize
                 blockW = min( blockSize, dsTarget.RasterXSize-blockOffsetX )
                 if blockW == 0: continue

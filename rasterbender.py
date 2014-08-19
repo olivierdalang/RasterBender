@@ -158,8 +158,8 @@ class RasterBender:
         sourceDataB = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3))
 
         # Open the target into numpy array
-        if not QFile(self.dlg.targetRasterPath()).exists():
-            shutil.copy( self.dlg.sourceRasterPath(), self.dlg.targetRasterPath() ) # if the target doesn't exist, we use the source target
+        shutil.copy( self.dlg.sourceRasterPath(), self.dlg.targetRasterPath() ) # if the target doesn't exist, we use the source target
+            
 
         dsTarget = gdal.Open(self.dlg.targetRasterPath(), gdal.GA_Update )
 

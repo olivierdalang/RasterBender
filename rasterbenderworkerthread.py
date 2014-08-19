@@ -107,7 +107,7 @@ class RasterBenderWorkerThread(QThread):
 
 
         #Loop through every block
-        blockSize = 100
+        blockSize = 1000
         blockCountX = dsTarget.RasterXSize//blockSize+1
         blockCountY = dsTarget.RasterYSize//blockSize+1
         blockCount = blockCountX*blockCountY
@@ -122,12 +122,12 @@ class RasterBenderWorkerThread(QThread):
         for blockNumY in range(0, blockCountX ):
             blockOffsetY = blockNumY*blockSize
             blockH = min( blockSize, dsTarget.RasterYSize-blockOffsetY )
-            if blockH == 0: continue
+            if blockH <= 0: continue
 
             for blockNumX in range(0, blockCountY ):
                 blockOffsetX = blockNumX*blockSize
                 blockW = min( blockSize, dsTarget.RasterXSize-blockOffsetX )
-                if blockW == 0: continue
+                if blockW <= 0: continue
 
                 blockI += 1
                 pixelCount = blockW*blockH

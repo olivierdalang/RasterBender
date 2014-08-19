@@ -29,13 +29,16 @@ from qgis.gui import *
 # Basic dependencies
 from osgeo import gdal  
 from osgeo import gdalnumeric
-import os.path, shutil
+import os.path, shutil, subprocess
 import sys
 import math
 import numpy
 
 # Other classes
 from rasterbendertransformers import *
+
+from processing.algs.gdal.GdalUtils import GdalUtils
+
 
 
 class RasterBenderWorkerThread(QThread):
@@ -75,6 +78,45 @@ class RasterBenderWorkerThread(QThread):
 
         #Open the dataset
         gdal.UseExceptions()
+
+        dsSource = gdal.Open( self.sourcePath, gdal.GA_ReadOnly )
+
+        # Get the transformation
+        pixW = float(dsSource.RasterXSize-1) #width in pixel
+        pixH = float(dsSource.RasterYSize-1) #width in pixel
+        mapW = float(dsSource.RasterXSize)*dsSource.GetGeoTransform()[1] #width in map units
+        mapH = float(dsSource.RasterYSize)*dsSource.GetGeoTransform()[5] #width in map units
+        offX = dsSource.GetGeoTransform()[0] #offset in map units
+        offY = dsSource.GetGeoTransform()[3] #offset in map units
+
+        def xyToQgsPoint(x, y):
+            return QgsPoint( offX + mapW * (x/pixW), offY + mapH * (y/pixH) )
+        def qgsPointToXY(qgspoint):
+            return ( int((qgspoint.x() - offX) / mapW * pixW ) , int((qgspoint.y() - offY) / mapH * pixH ) )
+
+
+
+        os.remove(self.targetPath)
+
+        arguments = ['-gcp',0,0,2311650,5035050,'-gcp',pixW,0,2311651,5035050,'-gcp',0,pixH,2311650,5035060,self.sourcePath,self.targetPath]
+        argumentsStr = [str(a) for a in arguments]
+        GdalUtils.runGdal(['gdal_translate', GdalUtils.escapeAndJoin(argumentsStr)], None)
+
+        #arguments = [self.sourcePath,self.targetPath]
+        #GdalUtils.runGdal(['gdalwarp', GdalUtils.escapeAndJoin(arguments)], None)
+
+        QgsMessageLog.logMessage('gdalwarp '+GdalUtils.escapeAndJoin(argumentsStr))
+        QgsMessageLog.logMessage(  '\n'.join(GdalUtils.getConsoleOutput())  )
+
+        #os.system(cmd)
+
+        return
+
+        for tri in self.transformer.delaunay.triangles:
+            srcTri = [self.transformer.pointsA[tri[0]],self.transformer.pointsA[tri[1]],self.transformer.pointsA[tri[2]]]
+            dstTri = [self.transformer.pointsB[tri[0]],self.transformer.pointsB[tri[1]],self.transformer.pointsB[tri[2]]]
+
+        return
 
         # Read the source data into numpy arrays
         dsSource = gdal.Open( self.sourcePath, gdal.GA_ReadOnly )

@@ -97,7 +97,6 @@ class BendTransformer(Transformer):
         y = l[0]*t1.y()+l[1]*t2.y()+l[2]*t3.y()
         return QgsPoint(x,y)
 
-
 class LinearTransformer(Transformer):
     def __init__(self, pairsLayer, restrictToSelection):
         Transformer.__init__(self, pairsLayer, restrictToSelection)

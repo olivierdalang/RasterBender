@@ -71,6 +71,7 @@ class RasterBenderWorkerThread(QThread):
         self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )            
         self.transformer = BendTransformer( self.pairsLayer, self.limitToSelection, self.bufferValue )
 
+
         # Starting to through all target pixels
 
         #Open the dataset
@@ -107,7 +108,7 @@ class RasterBenderWorkerThread(QThread):
 
 
         #Loop through every block
-        blockSize = 100
+        blockSize = 1000
         blockCountX = dsTarget.RasterXSize//blockSize+1
         blockCountY = dsTarget.RasterYSize//blockSize+1
         blockCount = blockCountX*blockCountY
@@ -116,18 +117,17 @@ class RasterBenderWorkerThread(QThread):
         displayTotal = dsTarget.RasterXSize*dsTarget.RasterYSize
         displayStep = min((blockSize**2)/10,5000) # update gui every n steps
 
-        self.progress.emit( "Starting computation... %i points to compute !! This can take a while..."  % (displayTotal), 0.0, 0.0)
-        
+        self.progress.emit( "Starting computation... %i points to compute !! This can take a while..."  % (displayTotal), 0.0, 0.0)        
 
         for blockNumY in range(0, blockCountX ):
             blockOffsetY = blockNumY*blockSize
             blockH = min( blockSize, dsTarget.RasterYSize-blockOffsetY )
-            if blockH == 0: continue
+            if blockH <= 0: continue
 
             for blockNumX in range(0, blockCountY ):
                 blockOffsetX = blockNumX*blockSize
                 blockW = min( blockSize, dsTarget.RasterXSize-blockOffsetX )
-                if blockW == 0: continue
+                if blockW <= 0: continue
 
                 blockI += 1
                 pixelCount = blockW*blockH
@@ -138,6 +138,8 @@ class RasterBenderWorkerThread(QThread):
                 if not hull.intersects( QgsRectangle( xyToQgsPoint(blockOffsetX, blockOffsetY), xyToQgsPoint(blockOffsetX+blockW, blockOffsetY+blockH) ) ):
                     self.progress.emit( "Block %i out of %i is out of the convex hull, we skip it..."  % (blockI, blockCount ), 0.0, blockI/float(blockCount) )
                     continue
+
+                # We get a list of triangles that intersect the block, since we don't want to search through all triangles if there's only few in the box
 
                 targetDataR = numpy.ndarray( (blockH, blockW) )
                 targetDataG = numpy.ndarray( (blockH, blockW) )
@@ -159,15 +161,14 @@ class RasterBenderWorkerThread(QThread):
 
                         newX, newY = qgsPointToXY(  self.transformer.map( xyToQgsPoint(blockOffsetX+x,blockOffsetY+y) )  )
 
+                        # TODO : this would maybe get interpolated results
                         #ident = sourceRaster.dataProvider().identify( pt, QgsRaster.IdentifyFormatValue)
-
                         #targetDataR[y][x] = ident.results()[1]
                         #targetDataG[y][x] = ident.results()[2]
                         #targetDataB[y][x] = ident.results()[3]
 
                         try:
-                            if newY<0 or newX<0: #avoid looping
-                                raise IndexError()
+                            if newY<0 or newX<0: raise IndexError() #avoid looping
                             targetDataR[y][x] = sourceDataR[newY][newX]
                             targetDataG[y][x] = sourceDataG[newY][newX]
                             targetDataB[y][x] = sourceDataB[newY][newX]

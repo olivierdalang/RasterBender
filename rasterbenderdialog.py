@@ -10,7 +10,7 @@ from qgis.gui import *
 import os.path
 
 # Other classes
-from rasterbendertransformers import *
+import triangulate # it seems we can't import fTools' voronoi directly, so we ship a copy of the file
 from rasterbenderworkerthread import RasterBenderWorkerThread
 
 
@@ -92,6 +92,11 @@ class RasterBenderDialog(QWidget):
         Returns the current buffer value depending on the input in the spinbox
         """
         return self.bufferSpinBox.value()
+    def blockSizeValue(self):
+        """
+        Returns the current blockSize value depending on the input in the spinbox
+        """
+        return self.blockSizeSpinBox.value()
 
     # Thread management
     def run(self):
@@ -102,7 +107,7 @@ class RasterBenderDialog(QWidget):
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 
-            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.restrictToSelection(), self.bufferValue(), self.sourceRasterPath(), self.targetRasterPath() )
+            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.restrictToSelection(), self.bufferValue(), self.blockSizeValue(), self.sourceRasterPath(), self.targetRasterPath() )
 
             self.workerThread.finished.connect( self.finish )
             self.workerThread.error.connect( self.error )
@@ -213,8 +218,11 @@ class RasterBenderDialog(QWidget):
         if self.restrictToSelection() and len(pL.selectedFeaturesIds()) < 3:
             self.displayMsg( "You must select at least 3 pairs.", True)
             return
+        if self.workerThread is not None and self.workerThread.isRunning():
+            self.displayMsg( "The algorithm is already running", True)
+            return
         if srcL == tarL:
-            self.displayMsg("The source raster will be overwritten !", True)
+            self.displayMsg( "The source raster will be overwritten !", True)
         else:        
             self.displayMsg("Ready to go...")
         self.runButton.setEnabled(True)
@@ -283,7 +291,6 @@ class RasterBenderDialog(QWidget):
             self.rubberBands[0].reset(QGis.Polygon)
             self.rubberBands[1].reset(QGis.Polygon)
             self.rubberBands[2].reset(QGis.Polygon)
-            self.rubberBands[3].reset(QGis.Polygon)
             self.rubberBands = None
     def showPreview(self):
 
@@ -295,51 +302,35 @@ class RasterBenderDialog(QWidget):
         self.rubberBands[0].reset(QGis.Polygon)
         self.rubberBands[1].reset(QGis.Polygon)
         self.rubberBands[2].reset(QGis.Polygon)
-        self.rubberBands[3].reset(QGis.Polygon)
 
-        pairsLayer = self.pairsLayer()
+        self.rubberBands[0].setColor(QColor(255,255,255,175))
+        self.rubberBands[1].setColor(QColor(255,0,0,50))
+        self.rubberBands[2].setColor(QColor(0,255,0,150))
 
-        transformer = BendTransformer( pairsLayer, self.pairsLayerRestrictToSelectionCheckBox.isChecked() ,self.bufferValue() )
-
-        self.rubberBands[0].setColor(QColor(220,220,255,175))
-        self.rubberBands[1].setColor(QColor(255,255,255,215))
-        self.rubberBands[2].setColor(QColor(255,0,0,50))
-        self.rubberBands[3].setColor(QColor(0,255,0,150))
-
-        self.rubberBands[0].setBrushStyle(Qt.SolidPattern)
-        self.rubberBands[1].setBrushStyle(Qt.SolidPattern)
+        self.rubberBands[0].setBrushStyle(Qt.SolidPattern)        
+        self.rubberBands[1].setBrushStyle(Qt.NoBrush)
         self.rubberBands[2].setBrushStyle(Qt.NoBrush)
-        self.rubberBands[3].setBrushStyle(Qt.NoBrush)
 
-        self.rubberBands[2].setWidth(3)
-        self.rubberBands[3].setWidth(1)      
+        self.rubberBands[1].setWidth(3)
+        self.rubberBands[2].setWidth(1)      
 
-        for i,tri in enumerate(transformer.delaunay):
+        triangles, pointsA, pointsB, hull = triangulate.triangulate( self.pairsLayer(), self.restrictToSelection(), self.bufferValue() )
+
+        for i,tri in enumerate(triangles):
             #draw the source triangles
-            self.rubberBands[3].addPoint( transformer.pointsA[tri[0]], False, i  )
-            self.rubberBands[3].addPoint( transformer.pointsA[tri[1]], False, i  )
-            self.rubberBands[3].addPoint( transformer.pointsA[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+            self.rubberBands[2].addPoint( pointsA[tri[0]], False, i  )
+            self.rubberBands[2].addPoint( pointsA[tri[1]], False, i  )
+            self.rubberBands[2].addPoint( pointsA[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
 
             #draw the target triangles
-            self.rubberBands[2].addPoint( transformer.pointsB[tri[0]], False, i  )
-            self.rubberBands[2].addPoint( transformer.pointsB[tri[1]], False, i  )
-            self.rubberBands[2].addPoint( transformer.pointsB[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+            self.rubberBands[1].addPoint( pointsB[tri[0]], False, i  )
+            self.rubberBands[1].addPoint( pointsB[tri[1]], False, i  )
+            self.rubberBands[1].addPoint( pointsB[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
         
         #draw the expanded hull
-        if transformer.expandedHull is not None:
-            for p in transformer.expandedHull.asPolygon()[0]:
-                self.rubberBands[0].addPoint( p, True, 0  )
-            for p in transformer.expandedHull.asPolygon()[0][0:1]:
-                #we readd the first point since it's not possible to make true rings with rubberbands
-                self.rubberBands[0].addPoint( p, True, 0  )
-
-        #draw the hull
-        for p in transformer.hull.asPolygon()[0]:
-            self.rubberBands[0].addPoint( p, True, 0  ) #inner ring of rubberband 1
-            self.rubberBands[1].addPoint( p, True, 0  )
-        for p in transformer.hull.asPolygon()[0][0:1]:
-            #we readd the first point since it's not possible to make true rings with rubberbands
+        for p in hull.asPolygon()[0]:
             self.rubberBands[0].addPoint( p, True, 0  )
+
     # Events
     def eventFilter(self,object,event):
         if QEvent is None:

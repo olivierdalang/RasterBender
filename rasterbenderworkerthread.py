@@ -35,7 +35,9 @@ import math
 import numpy
 
 # Other classes
-from rasterbendertransformers import *
+import triangulate # it seems we can't import fTools' voronoi directly, so we ship a copy of the file
+import algorithm_trifinder as trifinder
+import algorithm_trimapper as trimapper
 
 
 class RasterBenderWorkerThread(QThread):
@@ -44,18 +46,18 @@ class RasterBenderWorkerThread(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str, float, float) #message, pixel progress, block progress
 
-    def __init__(self, pairsLayer, limitToSelection, bufferValue, sourcePath, targetPath):
+    def __init__(self, pairsLayer, limitToSelection, bufferValue, blockSize, sourcePath, targetPath):
         QThread.__init__(self)
 
         self.pairsLayer = pairsLayer
         self.limitToSelection = limitToSelection
         self.bufferValue = bufferValue
+        self.blockSize = blockSize
+
         self.sourcePath = sourcePath
         self.targetPath = targetPath
 
         self._abort = False
-
-        self.transformer = None
 
 
 
@@ -68,11 +70,19 @@ class RasterBenderWorkerThread(QThread):
 
         self.progress.emit("Starting RasterBender", 0.0, 0.0)
 
-        self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )            
-        self.transformer = BendTransformer( self.pairsLayer, self.limitToSelection, self.bufferValue )
+        #####################################
+        # Step 1 : create the delaunay mesh #
+        #####################################
+
+        self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )
+
+        # Create the delaunay triangulation
+        triangles, pointsA, pointsB, hull = triangulate.triangulate( self.pairsLayer, self.limitToSelection, self.bufferValue )
 
 
-        # Starting to through all target pixels
+        ###############################
+        # Step 2. Opening the dataset #
+        ###############################
 
         #Open the dataset
         gdal.UseExceptions()
@@ -84,19 +94,20 @@ class RasterBenderWorkerThread(QThread):
         sourceDataG = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2))
         sourceDataB = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3))
 
-        # Open the target into numpy array
-        shutil.copy( self.sourcePath, self.targetPath ) # if the target doesn't exist, we use the source target
-            
-
-        dsTarget = gdal.Open(self.targetPath, gdal.GA_Update )
-
         # Get the transformation
-        pixW = float(dsTarget.RasterXSize-1) #width in pixel
-        pixH = float(dsTarget.RasterYSize-1) #width in pixel
-        mapW = float(dsTarget.RasterXSize)*dsTarget.GetGeoTransform()[1] #width in map units
-        mapH = float(dsTarget.RasterYSize)*dsTarget.GetGeoTransform()[5] #width in map units
-        offX = dsTarget.GetGeoTransform()[0] #offset in map units
-        offY = dsTarget.GetGeoTransform()[3] #offset in map units
+        pixW = float(dsSource.RasterXSize-1) #width in pixel
+        pixH = float(dsSource.RasterYSize-1) #width in pixel
+        mapW = float(dsSource.RasterXSize)*dsSource.GetGeoTransform()[1] #width in map units
+        mapH = float(dsSource.RasterYSize)*dsSource.GetGeoTransform()[5] #width in map units
+        offX = dsSource.GetGeoTransform()[0] #offset in map units
+        offY = dsSource.GetGeoTransform()[3] #offset in map units
+
+        # Open the target into numpy array
+        #dsTarget = gdal.Open(self.targetPath, gdal.GA_Update )
+        driver = gdal.GetDriverByName( "GTiff" )
+        dsTarget = driver.CreateCopy( self.targetPath, dsSource, 0 )
+        #dsTarget.SetGeoTransform( dsSource.GetGeoTransform() )
+        dsTarget = None #close
 
 
 
@@ -106,60 +117,84 @@ class RasterBenderWorkerThread(QThread):
             return ( int((qgspoint.x() - offX) / mapW * pixW ) , int((qgspoint.y() - offY) / mapH * pixH ) )
 
 
+        #######################################
+        # Step 3A. Looping through the blocks #
+        #######################################
 
         #Loop through every block
-        blockSize = 1000
-        blockCountX = dsTarget.RasterXSize//blockSize+1
-        blockCountY = dsTarget.RasterYSize//blockSize+1
+        blockCountX = dsSource.RasterXSize//self.blockSize+1
+        blockCountY = dsSource.RasterYSize//self.blockSize+1
         blockCount = blockCountX*blockCountY
         blockI = 0
 
-        displayTotal = dsTarget.RasterXSize*dsTarget.RasterYSize
-        displayStep = min((blockSize**2)/10,5000) # update gui every n steps
+        displayTotal = dsSource.RasterXSize*dsSource.RasterYSize
+        displayStep = min((self.blockSize**2)/20,10000) # update gui every n steps
 
         self.progress.emit( "Starting computation... %i points to compute !! This can take a while..."  % (displayTotal), 0.0, 0.0)        
 
         for blockNumY in range(0, blockCountX ):
-            blockOffsetY = blockNumY*blockSize
-            blockH = min( blockSize, dsTarget.RasterYSize-blockOffsetY )
+            blockOffsetY = blockNumY*self.blockSize
+            blockH = min( self.blockSize, dsSource.RasterYSize-blockOffsetY )
             if blockH <= 0: continue
 
             for blockNumX in range(0, blockCountY ):
-                blockOffsetX = blockNumX*blockSize
-                blockW = min( blockSize, dsTarget.RasterXSize-blockOffsetX )
+                blockOffsetX = blockNumX*self.blockSize
+                blockW = min( self.blockSize, dsSource.RasterXSize-blockOffsetX )
                 if blockW <= 0: continue
 
                 blockI += 1
                 pixelCount = blockW*blockH
                 pixelI = 0
 
+                blockRectangle = QgsRectangle(  xyToQgsPoint(blockOffsetX, blockOffsetY), 
+                                                xyToQgsPoint(blockOffsetX+blockW, blockOffsetY+blockH) ) # this is the shape of the block, used for optimization
+
                 # We check if the block intersects the hull, if not, we skip it
-                hull = self.transformer.expandedHull if self.transformer.expandedHull is not None else self.transformer.hull
-                if not hull.intersects( QgsRectangle( xyToQgsPoint(blockOffsetX, blockOffsetY), xyToQgsPoint(blockOffsetX+blockW, blockOffsetY+blockH) ) ):
+                if not hull.intersects( blockRectangle ):
                     self.progress.emit( "Block %i out of %i is out of the convex hull, we skip it..."  % (blockI, blockCount ), 0.0, blockI/float(blockCount) )
                     continue
 
-                # We get a list of triangles that intersect the block, since we don't want to search through all triangles if there's only few in the box
+                # We create the trifinder for the block
+                blockTrifinder = trifinder.Trifinder( pointsB, triangles, blockRectangle )
 
-                targetDataR = numpy.ndarray( (blockH, blockW) )
-                targetDataG = numpy.ndarray( (blockH, blockW) )
-                targetDataB = numpy.ndarray( (blockH, blockW) )
+                targetDataR = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1),blockOffsetX,blockOffsetY,blockW,blockH)
+                targetDataG = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2),blockOffsetX,blockOffsetY,blockW,blockH)
+                targetDataB = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3),blockOffsetX,blockOffsetY,blockW,blockH)
+
+
+                #######################################
+                # Step 3B. Looping through the pixels #
+                #######################################
 
                 # Loop through every pixel
                 for y in range(0, blockH):
                     for x in range(0, blockW):
-
+                        # If abort was called, we finish the process
                         if self._abort:
                             self.error.emit( "Aborted on pixel %i out of %i on block %i out of %i..."  % (pixelI, pixelCount, blockI, blockCount ))
                             return
 
-
                         pixelI+=1
-                        if pixelI%displayStep == 0:
-                            self.progress.emit("Working on pixel %i out of %i on block %i out of %i..."  % (pixelI, pixelCount, blockI, blockCount ), float(pixelI)/float(pixelCount),float(blockI)/float(blockCount) )
-                            
 
-                        newX, newY = qgsPointToXY(  self.transformer.map( xyToQgsPoint(blockOffsetX+x,blockOffsetY+y) )  )
+                        # Ever now and then, we update the status
+                        if pixelI%displayStep == 0:
+                            self.progress.emit("Working on pixel %i out of %i on block %i out of %i... Trifinder has %i triangles"  % (pixelI, pixelCount, blockI, blockCount,len(blockTrifinder.triangles) ), float(pixelI)/float(pixelCount),float(blockI)/float(blockCount) )
+                            
+                        # We find in which triangle the point lies using the trifinder.
+                        p = xyToQgsPoint(blockOffsetX+x, blockOffsetY+y)
+                        tri = blockTrifinder.find( p )
+                        if tri is None:
+                            # If it's in no triangle, we don't change it
+                            continue
+
+                        # If it's in a triangle, we transform the coordinates
+                        newP = trimapper.map(  p, 
+                                                                            pointsB[tri[0]], pointsB[tri[1]], pointsB[tri[2]],
+                                                                            pointsA[tri[0]], pointsA[tri[1]], pointsA[tri[2]] )
+
+                    
+
+                        newX, newY = qgsPointToXY(  newP  )
 
                         # TODO : this would maybe get interpolated results
                         #ident = sourceRaster.dataProvider().identify( pt, QgsRaster.IdentifyFormatValue)
@@ -177,10 +212,16 @@ class RasterBenderWorkerThread(QThread):
                             targetDataG[y][x] = 0
                             targetDataB[y][x] = 0
 
+                # Write to the image
+
+                dsTarget = gdal.Open(self.targetPath, gdal.GA_Update )
 
                 gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(1), targetDataR, blockOffsetX, blockOffsetY)  
                 gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(2), targetDataG, blockOffsetX, blockOffsetY)  
                 gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(3), targetDataB, blockOffsetX, blockOffsetY)
+
+                dsTarget = None
+
 
         self.finished.emit()
         return

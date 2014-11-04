@@ -296,7 +296,6 @@ class RasterBenderDialog(QWidget):
 
         self.rubberBands = (QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
                             QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
-                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
                             QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon))
 
         self.rubberBands[0].reset(QGis.Polygon)

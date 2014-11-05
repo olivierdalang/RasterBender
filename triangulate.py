@@ -1,7 +1,8 @@
+# -*- coding: utf-8 -*-
 
 from qgis.core import *
 
-import algorithm_voronoi as voronoi
+import algorithm_constrained_delaunay as algDelaunay
 
 
 def triangulate( pairsLayer, limitToSelection, bufferValue):
@@ -9,11 +10,25 @@ def triangulate( pairsLayer, limitToSelection, bufferValue):
     # Get the features of the pair layer and store them in two arrays
     pointsA = []
     pointsB = []
+    constraints = [] # will hold a list of list of points to represent the linestrings constraints
     features = pairsLayer.getFeatures() if not limitToSelection else pairsLayer.selectedFeatures()
     for feature in features:
+        constraint = []
+        lastPoint = None
         geom = feature.geometry().asPolyline()
-        pointsA.append( QgsPoint(geom[ 0]) )
-        pointsB.append( QgsPoint(geom[-1]) )
+        for i in range(0,len(geom)//2):
+            pointsA.append( QgsPoint(geom[2*i]) )
+            pointsB.append( QgsPoint(geom[2*i+1]) )
+
+            if lastPoint is None:
+                lastPoint = len(pointsA)-1
+
+            constraint.append( len(pointsA)-1 )
+
+        # Todo : do this only if applicable  
+        constraint.append( lastPoint )
+
+        constraints.append( constraint )
 
     # Make sure data is valid
     assert len(pointsA)>=3
@@ -31,7 +46,7 @@ def triangulate( pairsLayer, limitToSelection, bufferValue):
         hull = expandedHull
 
     # Create the delaunay triangulation
-    delaunay = voronoi.computeDelaunayTriangulation( [voronoi.Site(p.x(), p.y()) for p in pointsA] )
+    delaunay = algDelaunay.computeConstrainedDelaunayTriangulation( pointsA, None )
 
-    return [delaunay, pointsA, pointsB, hull]
+    return [delaunay, pointsA, pointsB, hull, constraints]
     

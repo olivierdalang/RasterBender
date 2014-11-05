@@ -291,29 +291,39 @@ class RasterBenderDialog(QWidget):
             self.rubberBands[0].reset(QGis.Polygon)
             self.rubberBands[1].reset(QGis.Polygon)
             self.rubberBands[2].reset(QGis.Polygon)
+            self.rubberBands[3].reset(QGis.Polygon)
+            self.rubberBands[4].reset(QGis.Polygon)
             self.rubberBands = None
     def showPreview(self):
 
         self.rubberBands = (QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
                             QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
-                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon))
+                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
+                            QgsRubberBand(self.iface.mapCanvas(), QGis.Line),
+                            QgsRubberBand(self.iface.mapCanvas(), QGis.Line))
 
         self.rubberBands[0].reset(QGis.Polygon)
         self.rubberBands[1].reset(QGis.Polygon)
         self.rubberBands[2].reset(QGis.Polygon)
+        self.rubberBands[3].reset(QGis.Line)
+        self.rubberBands[4].reset(QGis.Line)
 
         self.rubberBands[0].setColor(QColor(255,255,255,175))
         self.rubberBands[1].setColor(QColor(255,0,0,50))
         self.rubberBands[2].setColor(QColor(0,255,0,150))
+        self.rubberBands[3].setColor(QColor(0,0,255,255))
+        self.rubberBands[4].setColor(QColor(0,0,0,255))
 
         self.rubberBands[0].setBrushStyle(Qt.SolidPattern)        
         self.rubberBands[1].setBrushStyle(Qt.NoBrush)
         self.rubberBands[2].setBrushStyle(Qt.NoBrush)
 
         self.rubberBands[1].setWidth(3)
-        self.rubberBands[2].setWidth(1)      
+        self.rubberBands[2].setWidth(1)  
+        self.rubberBands[3].setWidth(5)  
+        self.rubberBands[4].setWidth(2)      
 
-        triangles, pointsA, pointsB, hull = triangulate.triangulate( self.pairsLayer(), self.restrictToSelection(), self.bufferValue() )
+        triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer(), self.restrictToSelection(), self.bufferValue() )
 
         for i,tri in enumerate(triangles):
             #draw the source triangles
@@ -326,6 +336,21 @@ class RasterBenderDialog(QWidget):
             self.rubberBands[1].addPoint( pointsB[tri[1]], False, i  )
             self.rubberBands[1].addPoint( pointsB[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
         
+        #draw the constraints
+        multiPolylineConstraints = []
+        for constraint in constraints:
+            multiPolylineConstraint = []
+            for pID in constraint:
+                multiPolylineConstraint.append( pointsA[pID] )
+            multiPolylineConstraints.append( multiPolylineConstraint )
+        self.rubberBands[4].setToGeometry( QgsGeometry.fromMultiPolyline(multiPolylineConstraints), None  )
+
+        #draw the pairs
+        multiPolylinePairs = []
+        for i,p in enumerate(pointsA):
+            multiPolylinePairs.append( [pointsA[i],pointsB[i]] )
+        self.rubberBands[3].setToGeometry( QgsGeometry.fromMultiPolyline(multiPolylinePairs), None  )
+
         #draw the expanded hull
         for p in hull.asPolygon()[0]:
             self.rubberBands[0].addPoint( p, True, 0  )

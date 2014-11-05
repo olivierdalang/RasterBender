@@ -46,7 +46,7 @@ def triangulate( pairsLayer, limitToSelection, bufferValue):
         hull = expandedHull
 
     # Create the delaunay triangulation
-    delaunay = algDelaunay.computeConstrainedDelaunayTriangulation( pointsA, None )
+    delaunay = algDelaunay.computeConstrainedDelaunayTriangulation( pointsA, constraints )
 
     return [delaunay, pointsA, pointsB, hull, constraints]
     

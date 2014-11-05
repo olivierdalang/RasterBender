@@ -315,8 +315,9 @@ class RasterBenderDialog(QWidget):
         self.rubberBands[4].setColor(QColor(0,0,0,255))
 
         self.rubberBands[0].setBrushStyle(Qt.SolidPattern)        
-        self.rubberBands[1].setBrushStyle(Qt.NoBrush)
+        self.rubberBands[1].setBrushStyle(Qt.Dense4Pattern)
         self.rubberBands[2].setBrushStyle(Qt.NoBrush)
+        self.rubberBands[4].setLineStyle(Qt.DashLine)
 
         self.rubberBands[1].setWidth(3)
         self.rubberBands[2].setWidth(1)  
@@ -327,9 +328,9 @@ class RasterBenderDialog(QWidget):
 
         for i,tri in enumerate(triangles):
             #draw the source triangles
-            self.rubberBands[2].addPoint( pointsA[tri[0]], False, i  )
-            self.rubberBands[2].addPoint( pointsA[tri[1]], False, i  )
-            self.rubberBands[2].addPoint( pointsA[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+            #self.rubberBands[2].addPoint( pointsA[tri[0]], False, i  )
+            #self.rubberBands[2].addPoint( pointsA[tri[1]], False, i  )
+            #self.rubberBands[2].addPoint( pointsA[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
 
             #draw the target triangles
             self.rubberBands[1].addPoint( pointsB[tri[0]], False, i  )
@@ -341,7 +342,7 @@ class RasterBenderDialog(QWidget):
         for constraint in constraints:
             multiPolylineConstraint = []
             for pID in constraint:
-                multiPolylineConstraint.append( pointsA[pID] )
+                multiPolylineConstraint.append( pointsB[pID] )
             multiPolylineConstraints.append( multiPolylineConstraint )
         self.rubberBands[4].setToGeometry( QgsGeometry.fromMultiPolyline(multiPolylineConstraints), None  )
 

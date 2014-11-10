@@ -78,7 +78,7 @@ class RasterBenderWorkerThread(QThread):
         self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )
 
         # Create the delaunay triangulation
-        triangles, pointsA, pointsB, hull = triangulate.triangulate( self.pairsLayer, self.limitToSelection, self.bufferValue, self.closeExpression )
+        triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer, self.limitToSelection, self.bufferValue, self.closeExpression )
 
 
         ###############################

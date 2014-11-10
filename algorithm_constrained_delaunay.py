@@ -41,10 +41,10 @@ def computeConstrainedDelaunayTriangulation(points, constraints):
         return ((y-raySy)*(rayEx-raySx)) > ((x-raySx)*(rayEy-raySy))
 
 
-
-    # For each segment, we must delete and retriangulate the triangles that it crosses
+    # Each linestring is a constraint
     for constraint in constraints:
 
+        # For each segment, we must delete and retriangulate the triangles that it crosses
         for i,point in enumerate(constraint):
 
             segment = [constraint[i-1],constraint[i]]

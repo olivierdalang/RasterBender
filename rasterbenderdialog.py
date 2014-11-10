@@ -29,6 +29,9 @@ class RasterBenderDialog(QWidget):
         # Keeps three rubberbands for delaunay's peview
         self.rubberBands = None
 
+        # Init fields
+        self.closeExpression.setField("0")
+
         # Connect the UI buttons
         self.previewButton.pressed.connect(self.showPreview)
         self.previewButton.released.connect(self.hidePreview)
@@ -112,7 +115,7 @@ class RasterBenderDialog(QWidget):
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 
-            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.restrictToSelection(), self.closureMode(), self.bufferValue(), self.blockSizeValue(), self.sourceRasterPath(), self.targetRasterPath() )
+            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.restrictToSelection(), self.closureExpression(), self.bufferValue(), self.blockSizeValue(), self.sourceRasterPath(), self.targetRasterPath() )
 
             self.workerThread.finished.connect( self.finish )
             self.workerThread.error.connect( self.error )

@@ -33,10 +33,8 @@ def triangulate( pairsLayer, limitToSelection, bufferValue, closeExpression):
                 constraint.append( lastPoint )
 
 
-
-            
-
-        constraints.append( constraint )
+        if len(constraint)>2:    
+            constraints.append( constraint )
 
     # Make sure data is valid
     assert len(pointsA)>=3

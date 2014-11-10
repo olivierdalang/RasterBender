@@ -28,7 +28,6 @@ class RasterBenderDialog(QWidget):
 
         # Keeps three rubberbands for delaunay's peview
         self.rubberBands = (QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
-                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
                             QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon))
 
         # Connect the UI buttons
@@ -201,12 +200,29 @@ class RasterBenderDialog(QWidget):
                 self.sourceRasterComboBox.addItem( layer.name(), layer.id() )
                 self.targetRasterComboBox.addItem( layer.name(), layer.id() )
 
+        # We switch back to the previously selected layer
         if oldPairsLayer is not None:
             index = self.pairsLayerComboBox.findData(oldPairsLayer.id())
             self.pairsLayerComboBox.setCurrentIndex( index )
+        else:
+            # If there was no previously selected layer, we make a clever guess using the layers title
+            allItems = [ self.pairsLayerComboBox.itemText(i) for i in range(self.pairsLayerComboBox.count())]
+            for i,item in enumerate(allItems):
+                if item.find("pair") != -1:
+                    self.pairsLayerComboBox.setCurrentIndex( i )
+                    break
+
+        # We switch back to the previously selected layer
         if oldConstraintsLayer is not None:
             index = self.constraintsLayerComboBox.findData(oldConstraintsLayer.id())
             self.constraintsLayerComboBox.setCurrentIndex( index )
+        else:
+            # If there was no previously selected layer, we make a clever guess using the layers title
+            allItems = [ self.constraintsLayerComboBox.itemText(i) for i in range(self.constraintsLayerComboBox.count())]
+            for i,item in enumerate(allItems):
+                if item.find("constraint") != -1:
+                    self.constraintsLayerComboBox.setCurrentIndex( i )
+                    break
 
     def updateEditStates(self):
         """
@@ -222,36 +238,50 @@ class RasterBenderDialog(QWidget):
         """
         To be run after changes have been made to the UI. It enables/disables the run button and display some messages.
         """
+
+        canRun = True
+        canPreview = True
+        errors = []
+
         # Checkin requirements
         self.runButton.setEnabled(False)
+        self.previewSlider.setEnabled(False)
 
         srcL = self.sourceRasterPath()
         tarL = self.targetRasterPath()
         pL = self.pairsLayer()
 
         if not QFile(srcL).exists or not QgsRasterLayer.isValidRasterFileName(srcL):
-            self.displayMsg( "You must select a valid and existing source raster path !", True )
-            return
+            errors.append( "You must select a valid and existing source raster path !" )
+            canRun = False
         if tarL=="":
-            self.displayMsg( "You must select a valid target raster path !", True )
-            return
+            errors.append( "You must select a valid target raster path !" )
+            canRun = False
         if pL is None:
-            self.displayMsg( "You must define a pairs layer.", True)
-            return
+            errors.append( "You must define a pairs layer.")
+            canRun, canPreview = False, False
         if len(pL.allFeatureIds()) < 3:
-            self.displayMsg( "The pairs layers must have at least 3 pairs.", True)
-            return
+            errors.append( "The pairs layers must have at least 3 pairs.")
+            canRun, canPreview = False, False
         if self.pairsLayerRestrictToSelection() and len(pL.selectedFeaturesIds()) < 3:
-            self.displayMsg( "You must select at least 3 pairs.", True)
-            return
+            errors.append( "You must select at least 3 pairs.")
+            canRun, canPreview = False, False
         if self.workerThread is not None and self.workerThread.isRunning():
-            self.displayMsg( "The algorithm is already running", True)
-            return
+            errors.append( "The algorithm is already running")
+            canRun = False
         if srcL == tarL:
-            self.displayMsg( "The source raster will be overwritten !", True)
-        else:        
+            errors.append( "The source raster will be overwritten !")
+
+        if canPreview:
+            self.previewSlider.setEnabled(True)
+        if canRun:
+            self.runButton.setEnabled(True)
+
+        if len(errors)>0:
+            self.displayMsg( "<br/>".join(errors), True)
+        else:
             self.displayMsg("Ready to go...")
-        self.runButton.setEnabled(True)
+
 
     # UI Setters
     def loadSourcePath(self):
@@ -342,7 +372,6 @@ class RasterBenderDialog(QWidget):
         if self.rubberBands is not None:
             self.rubberBands[0].reset(QGis.Polygon)
             self.rubberBands[1].reset(QGis.Polygon)
-            self.rubberBands[2].reset(QGis.Polygon)
     def showPreview(self):
         self.triangles, self.pointsA, self.pointsB, self.hull, constraints = triangulate.triangulate( self.pairsLayer(), self.pairsLayerRestrictToSelection(),self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue() )
         self.updatePreview()
@@ -352,7 +381,6 @@ class RasterBenderDialog(QWidget):
         if self.rubberBands is not None:
             self.rubberBands[0].reset(QGis.Polygon)
             self.rubberBands[1].reset(QGis.Polygon)
-            self.rubberBands[2].reset(QGis.Polygon)
 
         if self.triangles is None or self.hull is None:
             return
@@ -360,24 +388,21 @@ class RasterBenderDialog(QWidget):
         percent = float(self.previewSlider.sliderPosition()-self.previewSlider.minimum()) / float( self.previewSlider.maximum()-self.previewSlider.minimum() )
 
         self.rubberBands[0].setColor(QColor(255,255,255,180))
-        self.rubberBands[1].setColor(QColor( int((1.0-percent)*255.0),int(percent*255.0),0,255))
-        self.rubberBands[2].setColor(QColor(0,170,0,255))
+        self.rubberBands[1].setColor(QColor( int((1.0-percent)*255.0),int(percent*170.0),0,255))
 
         self.rubberBands[0].setBrushStyle(Qt.SolidPattern)        
         self.rubberBands[1].setBrushStyle(Qt.NoBrush)
-        self.rubberBands[2].setBrushStyle(Qt.NoBrush)
 
         self.rubberBands[1].setWidth(2)
-        self.rubberBands[2].setWidth(1)
 
         def interpolatePoints(pA, pB, ratio):
             return QgsPoint( (1.0-ratio)*pA.x()+ratio*pB.x(), (1.0-ratio)*pA.y()+ratio*pB.y() )
         
         for i,tri in enumerate(self.triangles):
-            #draw the source triangles
-            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[0]],self.pointsB[tri[0]],percent) )
-            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[1]],self.pointsB[tri[1]],percent) )
-            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[2]],self.pointsB[tri[2]],percent) ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+            #draw the triangles
+            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[0]],self.pointsB[tri[0]],percent), False, i )
+            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[1]],self.pointsB[tri[1]],percent), False, i )
+            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[2]],self.pointsB[tri[2]],percent), True, i ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
             
 
         #draw the expanded hull

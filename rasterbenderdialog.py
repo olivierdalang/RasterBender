@@ -27,16 +27,17 @@ class RasterBenderDialog(QWidget):
         self.workerThread = None
 
         # Keeps three rubberbands for delaunay's peview
-        self.rubberBands = None
-
-        # Init fields
-        self.closeExpression.setField("0")
+        self.rubberBands = (QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
+                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
+                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon))
 
         # Connect the UI buttons
-        self.previewButton.pressed.connect(self.showPreview)
-        self.previewButton.released.connect(self.hidePreview)
+        self.previewSlider.sliderPressed.connect(self.showPreview)
+        self.previewSlider.sliderReleased.connect(self.hidePreview)
+        self.previewSlider.sliderMoved.connect(self.updatePreview)
 
-        self.createMemoryLayerButton.clicked.connect(self.createMemoryLayer)
+        self.createPairsLayerButton.clicked.connect(self.createPairsLayer)
+        self.createConstraintsLayerButton.clicked.connect(self.createConstraintsLayer)
 
         self.pairsLayerEditModeButton.clicked.connect( self.toggleEditMode )
 
@@ -85,16 +86,22 @@ class RasterBenderDialog(QWidget):
         """
         layerId = self.pairsLayerComboBox.itemData(self.pairsLayerComboBox.currentIndex())
         return QgsMapLayerRegistry.instance().mapLayer(layerId)
-    def closureExpression(self):
+    def constraintsLayer(self):
         """
-        Returns the current pairsLayer layer depending on what is choosen in the pairsLayerComboBox
-        """        
-        return self.closeExpression.currentText()
-    def restrictToSelection(self):
+        Returns the current constraintsLayer layer depending on what is choosen in the constraintsLayerComboBox
+        """
+        layerId = self.constraintsLayerComboBox.itemData(self.constraintsLayerComboBox.currentIndex())
+        return QgsMapLayerRegistry.instance().mapLayer(layerId)
+    def pairsLayerRestrictToSelection(self):
         """
         Returns the current restrict to selection depending on the input in the checkbox
         """
         return self.pairsLayerRestrictToSelectionCheckBox.isChecked()
+    def constraintsLayerRestrictToSelection(self):
+        """
+        Returns the current restrict to selection depending on the input in the checkbox
+        """
+        return self.constraintsLayerRestrictToSelectionCheckBox.isChecked()
     def bufferValue(self):
         """
         Returns the current buffer value depending on the input in the spinbox
@@ -115,7 +122,7 @@ class RasterBenderDialog(QWidget):
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 
-            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.restrictToSelection(), self.closureExpression(), self.bufferValue(), self.blockSizeValue(), self.sourceRasterPath(), self.targetRasterPath() )
+            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.pairsLayerRestrictToSelection(), self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue(), self.blockSizeValue(), self.sourceRasterPath(), self.targetRasterPath() )
 
             self.workerThread.finished.connect( self.finish )
             self.workerThread.error.connect( self.error )
@@ -163,11 +170,8 @@ class RasterBenderDialog(QWidget):
         # Update the comboboxes
         self.updateLayersComboboxes()
 
-        # Set the expression to use the selected layer
-        self.closeExpression.setLayer( self.pairsLayer() )
-
         # Update the edit mode buttons
-        self.updateEditState_pairsLayer()
+        self.updateEditStates()
 
         # Chech the requirements
         self.checkRequirements()
@@ -177,18 +181,22 @@ class RasterBenderDialog(QWidget):
         Recreate the comboboxes to display existing layers.
         """
         oldPairsLayer = self.pairsLayer()
+        oldConstraintsLayer = self.constraintsLayer()
 
         self.sourceRasterComboBox.clear()
         self.targetRasterComboBox.clear()
         self.pairsLayerComboBox.clear()
+        self.constraintsLayerComboBox.clear()
 
         self.sourceRasterComboBox.addItem( "- loaded rasters -" )
         self.targetRasterComboBox.addItem( "- loaded rasters -" )
+        self.constraintsLayerComboBox.addItem( "- none -", None )
 
         for layer in self.iface.legendInterface().layers():
             if layer.type() == QgsMapLayer.VectorLayer:
                 if layer.geometryType() == QGis.Line :
                     self.pairsLayerComboBox.addItem( layer.name(), layer.id() )
+                    self.constraintsLayerComboBox.addItem( layer.name(), layer.id() )
             elif layer.type() == QgsMapLayer.RasterLayer:
                 self.sourceRasterComboBox.addItem( layer.name(), layer.id() )
                 self.targetRasterComboBox.addItem( layer.name(), layer.id() )
@@ -196,13 +204,19 @@ class RasterBenderDialog(QWidget):
         if oldPairsLayer is not None:
             index = self.pairsLayerComboBox.findData(oldPairsLayer.id())
             self.pairsLayerComboBox.setCurrentIndex( index )
+        if oldConstraintsLayer is not None:
+            index = self.constraintsLayerComboBox.findData(oldConstraintsLayer.id())
+            self.constraintsLayerComboBox.setCurrentIndex( index )
 
-    def updateEditState_pairsLayer(self):
+    def updateEditStates(self):
         """
-        Update the edit state button for pairsLayer
+        Update the edit state button for layers
         """
         l = self.pairsLayer()
         self.pairsLayerEditModeButton.setChecked( False if (l is None or not l.isEditable()) else True )
+
+        l = self.constraintsLayer()
+        self.constraintsLayerEditModeButton.setChecked( False if (l is None or not l.isEditable()) else True )
     
     def checkRequirements(self):
         """
@@ -227,7 +241,7 @@ class RasterBenderDialog(QWidget):
         if len(pL.allFeatureIds()) < 3:
             self.displayMsg( "The pairs layers must have at least 3 pairs.", True)
             return
-        if self.restrictToSelection() and len(pL.selectedFeaturesIds()) < 3:
+        if self.pairsLayerRestrictToSelection() and len(pL.selectedFeaturesIds()) < 3:
             self.displayMsg( "You must select at least 3 pairs.", True)
             return
         if self.workerThread is not None and self.workerThread.isRunning():
@@ -268,19 +282,41 @@ class RasterBenderDialog(QWidget):
         self.refreshStates()
 
     # Misc
-    def createMemoryLayer(self):
+    def createConstraintsLayer(self):
         """
         Creates a new memory layer to be used as pairLayer, and selects it in the ComboBox.
         """
 
+        name="Raster Bender - constraints"
         suffix = ""
-        name = "Raster Bender"
         while len( QgsMapLayerRegistry.instance().mapLayersByName( name+suffix ) ) > 0:
             if suffix == "": suffix = " 1"
             else: suffix = " "+str(int(suffix)+1)
 
         newMemoryLayer = QgsVectorLayer("Linestring", name+suffix, "memory")
-        newMemoryLayer.loadNamedStyle(os.path.join(os.path.dirname(__file__),'PairStyle.qml'), False)
+        newMemoryLayer.loadNamedStyle(os.path.join(os.path.dirname(__file__),"ConstraintsStyle.qml"), False)
+        QgsMapLayerRegistry.instance().addMapLayer(newMemoryLayer)
+
+        self.updateLayersComboboxes()
+
+        index = self.constraintsLayerComboBox.findData(newMemoryLayer.id())
+        self.constraintsLayerComboBox.setCurrentIndex( index )
+        
+        newMemoryLayer.startEditing()
+        self.refreshStates()
+    def createPairsLayer(self):
+        """
+        Creates a new memory layer to be used as pairLayer, and selects it in the ComboBox.
+        """
+
+        name="Raster Bender - pairs"
+        suffix = ""
+        while len( QgsMapLayerRegistry.instance().mapLayersByName( name+suffix ) ) > 0:
+            if suffix == "": suffix = " 1"
+            else: suffix = " "+str(int(suffix)+1)
+
+        newMemoryLayer = QgsVectorLayer("Linestring", name+suffix, "memory")
+        newMemoryLayer.loadNamedStyle(os.path.join(os.path.dirname(__file__),"PairStyle.qml"), False)
         QgsMapLayerRegistry.instance().addMapLayer(newMemoryLayer)
 
         self.updateLayersComboboxes()
@@ -299,74 +335,55 @@ class RasterBenderDialog(QWidget):
             msg = "<font color='red'>"+msg+"</font>"
         self.statusLabel.setText( msg )  
     def hidePreview(self):
+        self.triangles = None
+        self.hull = None
+        self.pointsA = None
+        self.pointsB = None
         if self.rubberBands is not None:
             self.rubberBands[0].reset(QGis.Polygon)
             self.rubberBands[1].reset(QGis.Polygon)
             self.rubberBands[2].reset(QGis.Polygon)
-            self.rubberBands[3].reset(QGis.Polygon)
-            self.rubberBands[4].reset(QGis.Polygon)
-            self.rubberBands = None
     def showPreview(self):
+        self.triangles, self.pointsA, self.pointsB, self.hull, constraints = triangulate.triangulate( self.pairsLayer(), self.pairsLayerRestrictToSelection(),self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue() )
+        self.updatePreview()
+        
+    def updatePreview(self):
 
-        self.rubberBands = (QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
-                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
-                            QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
-                            QgsRubberBand(self.iface.mapCanvas(), QGis.Line),
-                            QgsRubberBand(self.iface.mapCanvas(), QGis.Line))
+        if self.rubberBands is not None:
+            self.rubberBands[0].reset(QGis.Polygon)
+            self.rubberBands[1].reset(QGis.Polygon)
+            self.rubberBands[2].reset(QGis.Polygon)
 
-        self.rubberBands[0].reset(QGis.Polygon)
-        self.rubberBands[1].reset(QGis.Polygon)
-        self.rubberBands[2].reset(QGis.Polygon)
-        self.rubberBands[3].reset(QGis.Line)
-        self.rubberBands[4].reset(QGis.Line)
+        if self.triangles is None or self.hull is None:
+            return
 
-        self.rubberBands[0].setColor(QColor(255,255,255,175))
-        self.rubberBands[1].setColor(QColor(255,0,0,50))
-        self.rubberBands[2].setColor(QColor(0,255,0,150))
-        self.rubberBands[3].setColor(QColor(0,0,255,255))
-        self.rubberBands[4].setColor(QColor(0,0,0,255))
+        percent = float(self.previewSlider.sliderPosition()-self.previewSlider.minimum()) / float( self.previewSlider.maximum()-self.previewSlider.minimum() )
+
+        self.rubberBands[0].setColor(QColor(255,255,255,180))
+        self.rubberBands[1].setColor(QColor( int((1.0-percent)*255.0),int(percent*255.0),0,255))
+        self.rubberBands[2].setColor(QColor(0,170,0,255))
 
         self.rubberBands[0].setBrushStyle(Qt.SolidPattern)        
-        self.rubberBands[1].setBrushStyle(Qt.Dense4Pattern)
+        self.rubberBands[1].setBrushStyle(Qt.NoBrush)
         self.rubberBands[2].setBrushStyle(Qt.NoBrush)
-        self.rubberBands[4].setLineStyle(Qt.DashLine)
 
-        self.rubberBands[1].setWidth(3)
-        self.rubberBands[2].setWidth(1)  
-        self.rubberBands[3].setWidth(5)  
-        self.rubberBands[4].setWidth(1)      
+        self.rubberBands[1].setWidth(2)
+        self.rubberBands[2].setWidth(1)
 
-        triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer(), self.restrictToSelection(), self.bufferValue(), self.closureExpression() )
-
-        for i,tri in enumerate(triangles):
-            #draw the source triangles
-            #self.rubberBands[2].addPoint( pointsA[tri[0]], False, i  )
-            #self.rubberBands[2].addPoint( pointsA[tri[1]], False, i  )
-            #self.rubberBands[2].addPoint( pointsA[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
-
-            #draw the target triangles
-            self.rubberBands[1].addPoint( pointsB[tri[0]], False, i  )
-            self.rubberBands[1].addPoint( pointsB[tri[1]], False, i  )
-            self.rubberBands[1].addPoint( pointsB[tri[2]], True, i  ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+        def interpolatePoints(pA, pB, ratio):
+            return QgsPoint( (1.0-ratio)*pA.x()+ratio*pB.x(), (1.0-ratio)*pA.y()+ratio*pB.y() )
         
-        #draw the constraints
-        multiPolylineConstraints = []
-        for constraint in constraints:
-            multiPolylineConstraint = []
-            for pID in constraint:
-                multiPolylineConstraint.append( pointsB[pID] )
-            multiPolylineConstraints.append( multiPolylineConstraint )
-        self.rubberBands[4].setToGeometry( QgsGeometry.fromMultiPolyline(multiPolylineConstraints), None  )
-
-        #draw the pairs
-        multiPolylinePairs = []
-        for i,p in enumerate(pointsA):
-            multiPolylinePairs.append( [pointsA[i],pointsB[i]] )
-        self.rubberBands[3].setToGeometry( QgsGeometry.fromMultiPolyline(multiPolylinePairs), None  )
+        for i,tri in enumerate(self.triangles):
+            #draw the source triangles
+            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[0]],self.pointsB[tri[0]],percent) )
+            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[1]],self.pointsB[tri[1]],percent) )
+            self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[2]],self.pointsB[tri[2]],percent) ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+            
 
         #draw the expanded hull
-        for p in hull.asPolygon()[0]:
+        for p in self.hull.asPolygon()[0]:
             self.rubberBands[0].addPoint( p, True, 0  )
+
 
     # Events
     def eventFilter(self,object,event):

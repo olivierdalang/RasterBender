@@ -46,12 +46,13 @@ class RasterBenderWorkerThread(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str, float, float) #message, pixel progress, block progress
 
-    def __init__(self, pairsLayer, limitToSelection, closeExpression, bufferValue, blockSize, sourcePath, targetPath):
+    def __init__(self, pairsLayer, pairsLimitToSelection, constraintsLayer, constraintsLimitToSelection, bufferValue, blockSize, sourcePath, targetPath):
         QThread.__init__(self)
 
         self.pairsLayer = pairsLayer
-        self.limitToSelection = limitToSelection
-        self.closeExpression = closeExpression
+        self.pairsLimitToSelection = pairsLimitToSelection
+        self.constraintsLayer = constraintsLayer
+        self.constraintsLimitToSelection = constraintsLimitToSelection
         self.bufferValue = bufferValue
         self.blockSize = blockSize
 
@@ -78,7 +79,7 @@ class RasterBenderWorkerThread(QThread):
         self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )
 
         # Create the delaunay triangulation
-        triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer, self.limitToSelection, self.bufferValue, self.closeExpression )
+        triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer, self.pairsLimitToSelection, self.constraintsLayer, self.constraintsLimitToSelection, self.bufferValue )
 
 
         ###############################
@@ -131,7 +132,7 @@ class RasterBenderWorkerThread(QThread):
         displayTotal = dsSource.RasterXSize*dsSource.RasterYSize
         displayStep = min((self.blockSize**2)/20,10000) # update gui every n steps
 
-        self.progress.emit( "Starting computation... %i points to compute !! This can take a while..."  % (displayTotal), 0.0, 0.0)        
+        self.progress.emit( "Starting computation... This can take a while..." , 0.5, 0.5)        
 
         for blockNumY in range(0, blockCountX ):
             blockOffsetY = blockNumY*self.blockSize

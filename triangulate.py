@@ -5,35 +5,37 @@ from qgis.core import *
 import algorithm_constrained_delaunay as algDelaunay
 
 
-def triangulate( pairsLayer, limitToSelection, bufferValue, closeExpression):
+def triangulate( pairsLayer, pairsLimitToSelection, constraintsLayer, constraintsLimitToSelection, bufferValue ):
 
     # Get the features of the pair layer and store them in two arrays
     pointsA = []
     pointsB = []
     constraints = [] # will hold a list of list of points to represent the linestrings constraints
-    expression = QgsExpression(closeExpression) # this hold the expression determining whether we close the feature or not
 
-    features = pairsLayer.getFeatures() if not limitToSelection else pairsLayer.selectedFeatures()
-    for feature in features:
-        constraint = []
-        lastPoint = None
+    pairsFeatures = pairsLayer.getFeatures() if not pairsLimitToSelection else pairsLayer.selectedFeatures()
+    for feature in pairsFeatures:
         geom = feature.geometry().asPolyline()
-        for i in range(0,len(geom)//2):
-            pointsA.append( QgsPoint(geom[2*i]) )
-            pointsB.append( QgsPoint(geom[2*i+1]) )
+        pointsA.append( QgsPoint(geom[0]) )
+        pointsB.append( QgsPoint(geom[-1]) )
 
-            if lastPoint is None:
-                lastPoint = len(pointsA)-1
+    def findNearestPointIndex(point):
+        nearestIndex = None
+        nearestDist = None
+        for i,otherPoint in enumerate(pointsA):
+            dist = point.sqrDist( otherPoint )
+            if nearestIndex is None or dist<nearestDist:
+                nearestIndex = i
+                nearestDist = dist
+        return nearestIndex
 
-            constraint.append( len(pointsA)-1 )
 
-        # We close the feature if it's a triangle (or more) and if the closeExpression returns true
-        if len(constraint)>2:
-            if expression.evaluate(feature):
-                constraint.append( lastPoint )
-
-
-        if len(constraint)>2:    
+    if constraintsLayer is not None:
+        constraintsFeatures = constraintsLayer.getFeatures() if not constraintsLimitToSelection else constraintsLayer.selectedFeatures()
+        for feature in constraintsFeatures:
+            geom = feature.geometry().asPolyline()
+            constraint = []
+            for point in geom:
+                constraint.append( findNearestPointIndex(point) )
             constraints.append( constraint )
 
     # Make sure data is valid

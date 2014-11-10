@@ -119,7 +119,7 @@
       <item row="0" column="1">
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <item>
-         <widget class="QToolButton" name="createMemoryLayerButton">
+         <widget class="QToolButton" name="createPairsLayerButton">
           <property name="text">
            <string>create memory layer</string>
           </property>
@@ -155,6 +155,59 @@
         </item>
         <item>
          <widget class="QCheckBox" name="pairsLayerRestrictToSelectionCheckBox">
+          <property name="text">
+           <string>restrict to selection</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Constraints layer</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="QToolButton" name="createConstraintsLayerButton">
+          <property name="text">
+           <string>create memory layer</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>resources/mActionCaptureLine.png</normaloff>resources/mActionCaptureLine.png</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="constraintsLayerComboBox">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+            <horstretch>1</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="constraintsLayerEditModeButton">
+          <property name="text">
+           <string>toggle edit</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>resources/mIconEditable.png</normaloff>resources/mIconEditable.png</iconset>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="constraintsLayerRestrictToSelectionCheckBox">
           <property name="text">
            <string>restrict to selection</string>
           </property>
@@ -210,17 +263,31 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Close constraints</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <layout class="QHBoxLayout" name="horizontalLayout">
+      <item row="4" column="0" colspan="2">
+       <layout class="QHBoxLayout" name="horizontalLayout_4">
         <item>
-         <widget class="QgsFieldExpressionWidget" name="closeExpression" native="true"/>
+         <widget class="QLabel" name="label_6">
+          <property name="text">
+           <string>Before</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSlider" name="previewSlider">
+          <property name="value">
+           <number>99</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_7">
+          <property name="text">
+           <string>After</string>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>
@@ -346,14 +413,6 @@
    </item>
   </layout>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>QgsFieldExpressionWidget</class>
-   <extends>QWidget</extends>
-   <header>qgis.gui</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
  <resources/>
  <connections/>
 </ui>

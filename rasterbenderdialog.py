@@ -322,7 +322,7 @@ class RasterBenderDialog(QWidget):
         self.rubberBands[1].setWidth(3)
         self.rubberBands[2].setWidth(1)  
         self.rubberBands[3].setWidth(5)  
-        self.rubberBands[4].setWidth(2)      
+        self.rubberBands[4].setWidth(1)      
 
         triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer(), self.restrictToSelection(), self.bufferValue() )
 

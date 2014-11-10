@@ -82,6 +82,11 @@ class RasterBenderDialog(QWidget):
         """
         layerId = self.pairsLayerComboBox.itemData(self.pairsLayerComboBox.currentIndex())
         return QgsMapLayerRegistry.instance().mapLayer(layerId)
+    def closureExpression(self):
+        """
+        Returns the current pairsLayer layer depending on what is choosen in the pairsLayerComboBox
+        """        
+        return self.closeExpression.currentText()
     def restrictToSelection(self):
         """
         Returns the current restrict to selection depending on the input in the checkbox
@@ -107,7 +112,7 @@ class RasterBenderDialog(QWidget):
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 
-            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.restrictToSelection(), self.bufferValue(), self.blockSizeValue(), self.sourceRasterPath(), self.targetRasterPath() )
+            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.restrictToSelection(), self.closureMode(), self.bufferValue(), self.blockSizeValue(), self.sourceRasterPath(), self.targetRasterPath() )
 
             self.workerThread.finished.connect( self.finish )
             self.workerThread.error.connect( self.error )
@@ -155,6 +160,9 @@ class RasterBenderDialog(QWidget):
         # Update the comboboxes
         self.updateLayersComboboxes()
 
+        # Set the expression to use the selected layer
+        self.closeExpression.setLayer( self.pairsLayer() )
+
         # Update the edit mode buttons
         self.updateEditState_pairsLayer()
 
@@ -185,6 +193,7 @@ class RasterBenderDialog(QWidget):
         if oldPairsLayer is not None:
             index = self.pairsLayerComboBox.findData(oldPairsLayer.id())
             self.pairsLayerComboBox.setCurrentIndex( index )
+
     def updateEditState_pairsLayer(self):
         """
         Update the edit state button for pairsLayer
@@ -324,7 +333,7 @@ class RasterBenderDialog(QWidget):
         self.rubberBands[3].setWidth(5)  
         self.rubberBands[4].setWidth(1)      
 
-        triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer(), self.restrictToSelection(), self.bufferValue() )
+        triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer(), self.restrictToSelection(), self.bufferValue(), self.closureExpression() )
 
         for i,tri in enumerate(triangles):
             #draw the source triangles

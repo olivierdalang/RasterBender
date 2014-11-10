@@ -46,11 +46,12 @@ class RasterBenderWorkerThread(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str, float, float) #message, pixel progress, block progress
 
-    def __init__(self, pairsLayer, limitToSelection, bufferValue, blockSize, sourcePath, targetPath):
+    def __init__(self, pairsLayer, limitToSelection, closeExpression, bufferValue, blockSize, sourcePath, targetPath):
         QThread.__init__(self)
 
         self.pairsLayer = pairsLayer
         self.limitToSelection = limitToSelection
+        self.closeExpression = closeExpression
         self.bufferValue = bufferValue
         self.blockSize = blockSize
 
@@ -77,7 +78,7 @@ class RasterBenderWorkerThread(QThread):
         self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )
 
         # Create the delaunay triangulation
-        triangles, pointsA, pointsB, hull = triangulate.triangulate( self.pairsLayer, self.limitToSelection, self.bufferValue )
+        triangles, pointsA, pointsB, hull = triangulate.triangulate( self.pairsLayer, self.limitToSelection, self.bufferValue, self.closeExpression )
 
 
         ###############################

@@ -5,12 +5,14 @@ from qgis.core import *
 import algorithm_constrained_delaunay as algDelaunay
 
 
-def triangulate( pairsLayer, limitToSelection, bufferValue):
+def triangulate( pairsLayer, limitToSelection, bufferValue, closeExpression):
 
     # Get the features of the pair layer and store them in two arrays
     pointsA = []
     pointsB = []
     constraints = [] # will hold a list of list of points to represent the linestrings constraints
+    expression = QgsExpression(closeExpression) # this hold the expression determining whether we close the feature or not
+
     features = pairsLayer.getFeatures() if not limitToSelection else pairsLayer.selectedFeatures()
     for feature in features:
         constraint = []
@@ -25,8 +27,14 @@ def triangulate( pairsLayer, limitToSelection, bufferValue):
 
             constraint.append( len(pointsA)-1 )
 
-        # Todo : do this only if applicable  
-        constraint.append( lastPoint )
+        # We close the feature if it's a triangle (or more) and if the closeExpression returns true
+        if len(constraint)>2:
+            if expression.evaluate(feature):
+                constraint.append( lastPoint )
+
+
+
+            
 
         constraints.append( constraint )
 

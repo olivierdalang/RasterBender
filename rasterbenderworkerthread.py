@@ -134,12 +134,12 @@ class RasterBenderWorkerThread(QThread):
 
         self.progress.emit( "Starting computation... This can take a while..." , 0.5, 0.5)        
 
-        for blockNumY in range(0, blockCountX ):
+        for blockNumY in range(0, blockCountY ):
             blockOffsetY = blockNumY*self.blockSize
             blockH = min( self.blockSize, dsSource.RasterYSize-blockOffsetY )
             if blockH <= 0: continue
 
-            for blockNumX in range(0, blockCountY ):
+            for blockNumX in range(0, blockCountX ):
                 blockOffsetX = blockNumX*self.blockSize
                 blockW = min( self.blockSize, dsSource.RasterXSize-blockOffsetX )
                 if blockW <= 0: continue

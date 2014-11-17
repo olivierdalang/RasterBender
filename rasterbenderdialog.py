@@ -118,6 +118,8 @@ class RasterBenderDialog(QWidget):
 
         if self.worker is None or not self.worker.isRunning():
 
+            self.displayMsg("Starting the process !")
+
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 

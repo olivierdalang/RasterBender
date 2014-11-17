@@ -70,13 +70,13 @@ class RasterBenderWorkerThread(QThread):
 
         self._abort = False
 
-        self.progress.emit("Starting RasterBender", 0.0, 0.0)
+        self.progress.emit("Starting RasterBender", float(0), float(0))
 
         #####################################
         # Step 1 : create the delaunay mesh #
         #####################################
 
-        self.progress.emit( "Loading delaunay mesh...", 0.0, 0.0 )
+        self.progress.emit( "Loading delaunay mesh...", float(0), float(0) )
 
         # Create the delaunay triangulation
         triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer, self.pairsLimitToSelection, self.constraintsLayer, self.constraintsLimitToSelection, self.bufferValue )
@@ -85,6 +85,8 @@ class RasterBenderWorkerThread(QThread):
         ###############################
         # Step 2. Opening the dataset #
         ###############################
+
+        self.progress.emit( "Opening the dataset... This shouldn't be too long...", float(0), float(0) )
 
         #Open the dataset
         gdal.UseExceptions()
@@ -132,7 +134,7 @@ class RasterBenderWorkerThread(QThread):
         displayTotal = dsSource.RasterXSize*dsSource.RasterYSize
         displayStep = min((self.blockSize**2)/20,10000) # update gui every n steps
 
-        self.progress.emit( "Starting computation... This can take a while..." , 0.5, 0.5)        
+        self.progress.emit( "Starting computation... This can take a while..." , float(0), float(0))        
 
         for blockNumY in range(0, blockCountY ):
             blockOffsetY = blockNumY*self.blockSize
@@ -153,7 +155,7 @@ class RasterBenderWorkerThread(QThread):
 
                 # We check if the block intersects the hull, if not, we skip it
                 if not hull.intersects( blockRectangle ):
-                    self.progress.emit( "Block %i out of %i is out of the convex hull, we skip it..."  % (blockI, blockCount ), 0.0, blockI/float(blockCount) )
+                    self.progress.emit( "Block %i out of %i is out of the convex hull, we skip it..."  % (blockI, blockCount), float(0), float(blockI/float(blockCount) ) )
                     continue
 
                 # We create the trifinder for the block
@@ -173,7 +175,7 @@ class RasterBenderWorkerThread(QThread):
                     for x in range(0, blockW):
                         # If abort was called, we finish the process
                         if self._abort:
-                            self.error.emit( "Aborted on pixel %i out of %i on block %i out of %i..."  % (pixelI, pixelCount, blockI, blockCount ))
+                            self.error.emit( "Aborted on pixel %i out of %i on block %i out of %i..."  % (pixelI, pixelCount, blockI, blockCount ), float(0), float(0))
                             return
 
                         pixelI+=1

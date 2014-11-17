@@ -10,10 +10,10 @@
 
 [general]
 name=Raster Bender
-qgisMinimumVersion=2.4
-description=Does to vectors what georefencers does to raster. This feature is also known as "rubber sheeting".
-category=Vector
-version=0.1.1
+qgisMinimumVersion=2.6
+description=Distort rasters with high local deformation (such as historical maps) to adapt to contemporary data. This feature is also known as "rubber sheeting".
+category=Raster
+version=0.0
 author=Olivier Dalang
 email=olivier.dalang@gmail.com
 
@@ -22,14 +22,12 @@ email=olivier.dalang@gmail.com
 # Optional items:
 
 # Uncomment the following line and add your changelog entries:
-changelog=- 2014-05-22 - Version 0.0 : intial release
-- 2014-05-26 - Version 0.1 : linear and uniform transformation method, scipy dependency no more needed, better management of pinned points
-- 2014-07-17 - Version 0.1.1 : fixed bug due to misspelling
+changelog=- 2014-11-17 - Version 0.0 : intial release
 
 
 
 # tags are comma separated with spaces allowed
-tags=vector,georeference,deform,adapt,transform,affine,translate,distort,match,rubber sheet
+tags=raster,georeference,deform,adapt,transform,distort,match,rubber sheet
 
 homepage=https://github.com/olivierdalang/RasterBender
 tracker=https://github.com/olivierdalang/RasterBender/issues

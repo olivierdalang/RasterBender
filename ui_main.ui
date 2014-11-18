@@ -140,6 +140,20 @@
          </widget>
         </item>
         <item>
+         <widget class="QToolButton" name="styleLayerPair">
+          <property name="toolTip">
+           <string>Apply a style for pairs</string>
+          </property>
+          <property name="text">
+           <string>...</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>resources/styleIconPair.png</normaloff>resources/styleIconPair.png</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QToolButton" name="pairsLayerEditModeButton">
           <property name="text">
            <string>toggle edit</string>
@@ -189,6 +203,20 @@
             <horstretch>1</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="styleLayerConstraint">
+          <property name="toolTip">
+           <string>Apply a style for constraints</string>
+          </property>
+          <property name="text">
+           <string>...</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>resources/styleIconConstraint.png</normaloff>resources/styleIconConstraint.png</iconset>
           </property>
          </widget>
         </item>

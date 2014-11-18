@@ -49,6 +49,7 @@ The current raster bending algorithm is very sub-optimal and thus very slow.
 ## Version history
 
 - 2014-11-17 - Version 0.0 : intial release
+- 2014-11-18 - Version 0.0.1 : add style button
 
 
 ## Roadmap

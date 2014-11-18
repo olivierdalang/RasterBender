@@ -13,7 +13,7 @@ name=Raster Bender
 qgisMinimumVersion=2.6
 description=Distort rasters with high local deformation (such as historical maps) to adapt to contemporary data. This feature is also known as "rubber sheeting".
 category=Raster
-version=0.0
+version=0.0.1
 author=Olivier Dalang
 email=olivier.dalang@gmail.com
 
@@ -23,6 +23,7 @@ email=olivier.dalang@gmail.com
 
 # Uncomment the following line and add your changelog entries:
 changelog=- 2014-11-17 - Version 0.0 : intial release
+- 2014-11-18 - Version 0.0.1 : add style button
 
 
 

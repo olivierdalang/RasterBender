@@ -43,6 +43,9 @@ class RasterBenderDialog(QWidget):
         self.sourceRasterComboBox.activated.connect( self.loadSourcePath )
         self.targetRasterComboBox.activated.connect( self.loadTargetPath )
 
+        self.styleLayerPair.clicked.connect( self.loadStyleForPair )
+        self.styleLayerConstraint.clicked.connect( self.loadStyleForConstraint )
+
         self.runButton.clicked.connect(self.run)
         self.abortButton.clicked.connect(self.abort)
 
@@ -262,10 +265,10 @@ class RasterBenderDialog(QWidget):
         if pL is None:
             errors.append( "You must define a pairs layer.")
             canRun, canPreview = False, False
-        if len(pL.allFeatureIds()) < 3:
+        elif len(pL.allFeatureIds()) < 3:
             errors.append( "The pairs layers must have at least 3 pairs.")
             canRun, canPreview = False, False
-        if self.pairsLayerRestrictToSelection() and len(pL.selectedFeaturesIds()) < 3:
+        elif self.pairsLayerRestrictToSelection() and len(pL.selectedFeaturesIds()) < 3:
             errors.append( "You must select at least 3 pairs.")
             canRun, canPreview = False, False
         if self.workerThread is not None and self.workerThread.isRunning():
@@ -358,6 +361,19 @@ class RasterBenderDialog(QWidget):
         
         newMemoryLayer.startEditing()
         self.refreshStates()
+
+    def loadStyleForConstraint(self):
+        layer = self.constraintsLayer()
+        if layer is not None:
+            layer.loadNamedStyle(os.path.join(os.path.dirname(__file__),"ConstraintsStyle.qml"), False)
+        
+    def loadStyleForPair(self):
+        layer = self.pairsLayer()
+        if layer is not None:
+            layer.loadNamedStyle(os.path.join(os.path.dirname(__file__),"PairStyle.qml"), False)
+        
+
+
     
 
 

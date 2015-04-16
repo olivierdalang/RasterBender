@@ -27,8 +27,7 @@ from qgis.core import *
 from qgis.gui import *
 
 # Basic dependencies
-from osgeo import gdal  
-from osgeo import gdalnumeric
+import osgeo
 import os.path, shutil
 import sys
 import math
@@ -89,14 +88,14 @@ class RasterBenderWorkerThread(QThread):
         self.progress.emit( "Opening the dataset... This shouldn't be too long...", float(0), float(0) )
 
         #Open the dataset
-        gdal.UseExceptions()
+        osgeo.gdal.UseExceptions()
 
         # Read the source data into numpy arrays
-        dsSource = gdal.Open( self.sourcePath, gdal.GA_ReadOnly )
+        dsSource = osgeo.gdal.Open( self.sourcePath, osgeo.gdal.GA_ReadOnly )
 
-        sourceDataR = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1))
-        sourceDataG = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2))
-        sourceDataB = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3))
+        sourceDataR = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1))
+        sourceDataG = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2))
+        sourceDataB = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3))
 
         # Get the transformation
         pixW = float(dsSource.RasterXSize-1) #width in pixel
@@ -107,8 +106,8 @@ class RasterBenderWorkerThread(QThread):
         offY = dsSource.GetGeoTransform()[3] #offset in map units
 
         # Open the target into numpy array
-        #dsTarget = gdal.Open(self.targetPath, gdal.GA_Update )
-        driver = gdal.GetDriverByName( "GTiff" )
+        #dsTarget = osgeo.gdal.Open(self.targetPath, osgeo.gdal.GA_Update )
+        driver = osgeo.gdal.GetDriverByName( "GTiff" )
         dsTarget = driver.CreateCopy( self.targetPath, dsSource, 0 )
         #dsTarget.SetGeoTransform( dsSource.GetGeoTransform() )
         dsTarget = None #close
@@ -161,9 +160,9 @@ class RasterBenderWorkerThread(QThread):
                 # We create the trifinder for the block
                 blockTrifinder = trifinder.Trifinder( pointsB, triangles, blockRectangle )
 
-                targetDataR = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1),blockOffsetX,blockOffsetY,blockW,blockH)
-                targetDataG = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2),blockOffsetX,blockOffsetY,blockW,blockH)
-                targetDataB = gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3),blockOffsetX,blockOffsetY,blockW,blockH)
+                targetDataR = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1),blockOffsetX,blockOffsetY,blockW,blockH)
+                targetDataG = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2),blockOffsetX,blockOffsetY,blockW,blockH)
+                targetDataB = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3),blockOffsetX,blockOffsetY,blockW,blockH)
 
 
                 #######################################
@@ -218,11 +217,11 @@ class RasterBenderWorkerThread(QThread):
 
                 # Write to the image
 
-                dsTarget = gdal.Open(self.targetPath, gdal.GA_Update )
+                dsTarget = osgeo.gdal.Open(self.targetPath, osgeo.gdal.GA_Update )
 
-                gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(1), targetDataR, blockOffsetX, blockOffsetY)  
-                gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(2), targetDataG, blockOffsetX, blockOffsetY)  
-                gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(3), targetDataB, blockOffsetX, blockOffsetY)
+                osgeo.gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(1), targetDataR, blockOffsetX, blockOffsetY)  
+                osgeo.gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(2), targetDataG, blockOffsetX, blockOffsetY)  
+                osgeo.gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(3), targetDataB, blockOffsetX, blockOffsetY)
 
                 dsTarget = None
 

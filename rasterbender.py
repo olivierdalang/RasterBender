@@ -27,8 +27,6 @@ from qgis.core import *
 from qgis.gui import *
 
 # Basic dependencies
-from osgeo import gdal  
-from osgeo import gdalnumeric
 import os.path, shutil
 import sys
 import math

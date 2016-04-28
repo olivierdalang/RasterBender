@@ -56,5 +56,17 @@ def triangulate( pairsLayer, pairsLimitToSelection, constraintsLayer, constraint
     # Create the delaunay triangulation
     delaunay = algDelaunay.computeConstrainedDelaunayTriangulation( pointsA, constraints )
 
-    return [delaunay, pointsA, pointsB, hull, constraints]
+    triangles = []
+    for tri in delaunay:
+        if ( pointsB[tri[0]][0] == pointsA[tri[0]][0] and
+             pointsB[tri[0]][1] == pointsA[tri[0]][1] and
+             pointsB[tri[1]][0] == pointsA[tri[1]][0] and
+             pointsB[tri[1]][1] == pointsA[tri[1]][1] and
+             pointsB[tri[2]][0] == pointsA[tri[2]][0] and
+             pointsB[tri[2]][1] == pointsA[tri[2]][1] ):
+            # If the triangle hasn't changed
+            continue
+        triangles.append(tri)
+
+    return [triangles, pointsA, pointsB, hull, constraints]
     

@@ -117,7 +117,7 @@ class RasterBenderWorkerThread(QThread):
         def xyToQgsPoint(x, y):
             return QgsPoint( offX + mapW * (x/pixW), offY + mapH * (y/pixH) )
         def qgsPointToXY(qgspoint):
-            return ( int((qgspoint.x() - offX) / mapW * pixW ) , int((qgspoint.y() - offY) / mapH * pixH ) )
+            return ( (qgspoint.x() - offX) / mapW * pixW , (qgspoint.y() - offY) / mapH * pixH )
 
 
         #######################################
@@ -207,9 +207,38 @@ class RasterBenderWorkerThread(QThread):
 
                         try:
                             if newY<0 or newX<0: raise IndexError() #avoid looping
-                            targetDataR[y][x] = sourceDataR[newY][newX]
-                            targetDataG[y][x] = sourceDataG[newY][newX]
-                            targetDataB[y][x] = sourceDataB[newY][newX]
+
+                            #      0  1 
+                            # 0   [A][B]
+                            # 1   [C][D]
+
+                            # The pixel A is at the int value, but we want to interpolate with pixels B, C and D
+
+                            newXint = int(newX)
+                            newXflt = newX-newXint
+                            newYint = int(newY)
+                            newYflt = newY-newYint
+
+                            pixA_R = sourceDataR[newYint][newXint]
+                            pixA_G = sourceDataG[newYint][newXint]
+                            pixA_B = sourceDataB[newYint][newXint]
+                            pixB_R = sourceDataR[newYint][newXint+1]
+                            pixB_G = sourceDataG[newYint][newXint+1]
+                            pixB_B = sourceDataB[newYint][newXint+1]
+                            pixC_R = sourceDataR[newYint+1][newXint]
+                            pixC_G = sourceDataG[newYint+1][newXint]
+                            pixC_B = sourceDataB[newYint+1][newXint]
+                            pixD_R = sourceDataR[newYint+1][newXint+1]
+                            pixD_G = sourceDataG[newYint+1][newXint+1]
+                            pixD_B = sourceDataB[newYint+1][newXint+1]
+
+                            R = (1-newYflt)*((1-0-newXflt)*pixA_R + (newXflt)*pixB_R)+(newYflt)*((1-0-newXflt)*pixC_R + (newXflt)*pixD_R)
+                            G = (1-newYflt)*((1-0-newXflt)*pixA_G + (newXflt)*pixB_G)+(newYflt)*((1-0-newXflt)*pixC_G + (newXflt)*pixD_G)
+                            B = (1-newYflt)*((1-0-newXflt)*pixA_B + (newXflt)*pixB_B)+(newYflt)*((1-0-newXflt)*pixC_B + (newXflt)*pixD_B)
+
+                            targetDataR[y][x] = R
+                            targetDataG[y][x] = G
+                            targetDataB[y][x] = B
                         except IndexError, e:
                             targetDataR[y][x] = 0
                             targetDataG[y][x] = 0

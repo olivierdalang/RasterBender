@@ -50,6 +50,7 @@ The current raster bending algorithm is very sub-optimal and thus very slow.
 
 - 2014-11-17 - Version 0.0 : intial release
 - 2014-11-18 - Version 0.0.1 : add style button
+- 2016-04-27 - Version 0.0.2 : the deformation is interpolated - sponsored by Geodeticca http://www.geodeticca.sk
 
 
 ## Roadmap

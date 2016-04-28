@@ -422,10 +422,12 @@ class RasterBenderDialog(QWidget):
             self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[1]],self.pointsB[tri[1]],percent), False, i )
             self.rubberBands[1].addPoint( interpolatePoints(self.pointsA[tri[2]],self.pointsB[tri[2]],percent), True, i ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
             
+            #draw the background
+            self.rubberBands[0].addPoint( interpolatePoints(self.pointsA[tri[0]],self.pointsB[tri[0]],percent), False, i )
+            self.rubberBands[0].addPoint( interpolatePoints(self.pointsA[tri[1]],self.pointsB[tri[1]],percent), False, i )
+            self.rubberBands[0].addPoint( interpolatePoints(self.pointsA[tri[2]],self.pointsB[tri[2]],percent), True, i ) #TODO : this refreshes the rubber band on each triangle, it should be updated only once after this loop       
+            
 
-        #draw the expanded hull
-        for p in self.hull.asPolygon()[0]:
-            self.rubberBands[0].addPoint( p, True, 0  )
 
 
     # Events

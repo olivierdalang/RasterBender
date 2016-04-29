@@ -109,11 +109,6 @@ class RasterBenderDialog(QWidget):
         Returns the current buffer value depending on the input in the spinbox
         """
         return self.bufferSpinBox.value()
-    def blockSizeValue(self):
-        """
-        Returns the current blockSize value depending on the input in the spinbox
-        """
-        return self.blockSizeSpinBox.value()
 
     # Thread management
     def run(self):
@@ -126,7 +121,7 @@ class RasterBenderDialog(QWidget):
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 
-            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.pairsLayerRestrictToSelection(), self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue(), self.blockSizeValue(), self.sourceRasterPath(), self.targetRasterPath() )
+            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.pairsLayerRestrictToSelection(), self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue(), self.sourceRasterPath(), self.targetRasterPath() )
 
             self.workerThread.finished.connect( self.finish )
             self.workerThread.error.connect( self.error )
@@ -146,9 +141,8 @@ class RasterBenderDialog(QWidget):
 
 
     # Thread slots
-    def progress(self, string, progPixel, progBlock):
-        self.pixelProgressBar.setValue( int(progPixel*100) )
-        self.blockProgressBar.setValue( int(progBlock*100) )
+    def progress(self, string, progress):
+        self.progressBar.setValue( int(progress*100) )
         self.displayMsg( string )    
     def error(self, string):
         self.displayMsg( string, True )
@@ -157,11 +151,18 @@ class RasterBenderDialog(QWidget):
         self.endThread()
     def finish(self):
         self.displayMsg( "Done !" )
-        self.blockProgressBar.setValue( 100 )
-        self.pixelProgressBar.setValue( 100 )
+        self.progressBar.setValue( 100 )
         self.runButton.setEnabled(True)
         self.abortButton.setEnabled(False)
         self.endThread()
+
+        already_loaded = False
+        for layer in self.iface.legendInterface().layers():
+            if layer.source()==self.targetRasterPath():
+                already_loaded=True
+                break
+        if not already_loaded:
+            self.iface.addRasterLayer(self.targetRasterPath())
 
 
 

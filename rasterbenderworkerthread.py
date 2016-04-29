@@ -42,9 +42,9 @@ class RasterBenderWorkerThread(QThread):
 
     finished = pyqtSignal()
     error = pyqtSignal(str)
-    progress = pyqtSignal(str, float, float) #message, pixel progress, block progress
+    progress = pyqtSignal(str, float) #message, progress percentage
 
-    def __init__(self, pairsLayer, pairsLimitToSelection, constraintsLayer, constraintsLimitToSelection, bufferValue, blockSize, sourcePath, targetPath):
+    def __init__(self, pairsLayer, pairsLimitToSelection, constraintsLayer, constraintsLimitToSelection, bufferValue, sourcePath, targetPath):
         QThread.__init__(self)
 
         self.pairsLayer = pairsLayer
@@ -52,7 +52,6 @@ class RasterBenderWorkerThread(QThread):
         self.constraintsLayer = constraintsLayer
         self.constraintsLimitToSelection = constraintsLimitToSelection
         self.bufferValue = bufferValue
-        self.blockSize = blockSize
 
         self.sourcePath = sourcePath
         self.targetPath = targetPath
@@ -68,13 +67,13 @@ class RasterBenderWorkerThread(QThread):
 
         self._abort = False
 
-        self.progress.emit("Starting RasterBender", float(0), float(0))
+        self.progress.emit("Starting RasterBender", float(0))
 
         #####################################
         # Step 1 : create the delaunay mesh #
         #####################################
 
-        self.progress.emit( "Loading delaunay mesh...", float(0), float(0) )
+        self.progress.emit( "Loading delaunay mesh...", float(0) )
 
         # Create the delaunay triangulation
         triangles, pointsA, pointsB, hull, constraints = triangulate.triangulate( self.pairsLayer, self.pairsLimitToSelection, self.constraintsLayer, self.constraintsLimitToSelection, self.bufferValue )
@@ -84,7 +83,7 @@ class RasterBenderWorkerThread(QThread):
         # Step 2. Opening the dataset #
         ###############################
 
-        self.progress.emit( "Opening the dataset... This shouldn't be too long...", float(0), float(0) )
+        self.progress.emit( "Opening the dataset... This shouldn't be too long...", float(0) )
 
         #Open the dataset
         osgeo.gdal.UseExceptions()
@@ -112,8 +111,10 @@ class RasterBenderWorkerThread(QThread):
         def qgsPointToXY(qgspoint):
             return ( (qgspoint.x() - offX) / mapW * pixW , (qgspoint.y() - offY) / mapH * pixH )
 
+        count = len(triangles)
+        for i,triangle in enumerate(triangles):
 
-        for triangle in triangles:
+            self.progress.emit( "Computed triangle %i out of %i..." % (i, count), float(i)/float(count) )
 
             a0 = qgsPointToXY(pointsA[triangle[0]])
             b0 = pointsB[triangle[0]]
@@ -145,7 +146,7 @@ class RasterBenderWorkerThread(QThread):
             )
 
             try:
-                subprocess.check_output(args)
+                subprocess.check_output(args, shell=True)
             except subprocess.CalledProcessError as e:
                 QgsMessageLog.logMessage( str(e.cmd) )
                 QgsMessageLog.logMessage( e.output )
@@ -159,7 +160,8 @@ class RasterBenderWorkerThread(QThread):
             #     self.targetPath+'_tempcropped_'+str(i),
             # )
 
-            args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -dstnodata "-999" -r bilinear %s %s' % (
+            # args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -dstnodata "-999" -r bilinear %s %s' % (
+            args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -cblend 1 -dstnodata "-999" -r bilinear %s %s' % (
                 # tempWKT.fileName(),
                 self.targetPath+'_tempwkt.csv',
                 tempTranslated.fileName(),
@@ -167,7 +169,7 @@ class RasterBenderWorkerThread(QThread):
             )
 
             try:
-                subprocess.check_output(args)
+                subprocess.check_output(args, shell=True)
             except subprocess.CalledProcessError as e:
                 QgsMessageLog.logMessage( str(e.cmd) )
                 QgsMessageLog.logMessage( e.output )
@@ -180,7 +182,7 @@ class RasterBenderWorkerThread(QThread):
             # )
 
             # try:
-            #     subprocess.check_output(args)
+            #     subprocess.check_output(args, shell=True)
             # except subprocess.CalledProcessError as e:
             #     QgsMessageLog.logMessage( str(e.cmd) )
             #     QgsMessageLog.logMessage( e.output )
@@ -196,5 +198,6 @@ class RasterBenderWorkerThread(QThread):
 
 
         self.finished.emit()
+        return
 
 

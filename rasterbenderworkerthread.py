@@ -152,6 +152,7 @@ class RasterBenderWorkerThread(QThread):
             tempTranslated = QTemporaryFile()
             tempTranslated.open()
 
+            # TODO : get the propper path the gdal
             args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f -srcwin %f %f %f %f %s %s' % (
                 a0[0]-xoff,a0[1]-yoff,b0[0],b0[1],
                 a1[0]-xoff,a1[1]-yoff,b1[0],b1[1],
@@ -182,6 +183,7 @@ class RasterBenderWorkerThread(QThread):
             tempWKT.close()
             
 
+            # TODO : get the propper path the gdal
             args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -cblend 1 -dstnodata "-999" -r %s %s %s' % (
                 tempWKT.fileName(),
                 self.samplingMethod,

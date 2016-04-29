@@ -127,7 +127,7 @@ class RasterBenderWorkerThread(QThread):
                 self.error.emit( "Aborted on triangle %i out of %i..."  % (i, count))
                 return
 
-            self.progress.emit( "Computed triangle %i out of %i..." % (i, count), float(i)/float(count) )
+            self.progress.emit( "Computing triangle %i out of %i..." % (i, count), float(i)/float(count) )
 
             # aX are the pixels points of the initial triangles
             a0 = qgsPointToXY(pointsA[triangle[0]])
@@ -151,14 +151,6 @@ class RasterBenderWorkerThread(QThread):
 
             tempTranslated = QTemporaryFile()
             tempTranslated.open()
-
-            # args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f %s %s' % (
-            #     a0[0],a0[1],b0[0],b0[1],
-            #     a1[0],a1[1],b1[0],b1[1],
-            #     a2[0],a2[1],b2[0],b2[1], 
-            #     self.sourcePath,
-            #     tempTranslated.fileName(),
-            # )
 
             args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f -srcwin %f %f %f %f %s %s' % (
                 a0[0]-xoff,a0[1]-yoff,b0[0],b0[1],

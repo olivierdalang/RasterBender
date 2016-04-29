@@ -142,13 +142,29 @@ class RasterBenderWorkerThread(QThread):
 
             # Step 1 : we do an affine transformation by providing 3 -gcp points
 
+            # here we compute the parameters for srcwin, so that we don't compute the transformation on the whole raster
+            # we have a 2 pixels margins, hence the +/- 2 and the enclosing max/min (to avoid overbound)
+            xoff = max(    min(a0[0],a1[0],a2[0])-2    ,0)
+            yoff = max(    min(a0[1],a1[1],a2[1])-2    ,0)
+            xsize = min(    max(a0[0],a1[0],a2[0])+2-xoff    ,pixW-xoff)
+            ysize = min(    max(a0[1],a1[1],a2[1])+2-yoff    ,pixH-yoff)
+
             tempTranslated = QTemporaryFile()
             tempTranslated.open()
 
-            args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f %s %s' % (
-                a0[0],a0[1],b0[0],b0[1],
-                a1[0],a1[1],b1[0],b1[1],
-                a2[0],a2[1],b2[0],b2[1], 
+            # args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f %s %s' % (
+            #     a0[0],a0[1],b0[0],b0[1],
+            #     a1[0],a1[1],b1[0],b1[1],
+            #     a2[0],a2[1],b2[0],b2[1], 
+            #     self.sourcePath,
+            #     tempTranslated.fileName(),
+            # )
+
+            args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f -srcwin %f %f %f %f %s %s' % (
+                a0[0]-xoff,a0[1]-yoff,b0[0],b0[1],
+                a1[0]-xoff,a1[1]-yoff,b1[0],b1[1],
+                a2[0]-xoff,a2[1]-yoff,b2[0],b2[1], 
+                xoff, yoff, xsize, ysize, 
                 self.sourcePath,
                 tempTranslated.fileName(),
             )
@@ -156,7 +172,7 @@ class RasterBenderWorkerThread(QThread):
             try:
                 subprocess.check_output(args, shell=True)
             except subprocess.CalledProcessError as e:
-                self.error.emit( "Error on triangle %i out of %i : \"%s\""  % (i, count, str(e)))
+                self.error.emit( "Error on triangle %i out of %i : \"%s\" (%s)"  % (i, count, e.output, e.cmd))
                 return
 
 
@@ -184,7 +200,7 @@ class RasterBenderWorkerThread(QThread):
             try:
                 subprocess.check_output(args, shell=True)
             except subprocess.CalledProcessError as e:
-                self.error.emit( "Error on triangle %i out of %i : \"%s\""  % (i, count, str(e)))
+                self.error.emit( "Error on triangle %i out of %i : \"%s\" (%s)"  % (i, count, e.output, e.cmd))
                 return
 
 

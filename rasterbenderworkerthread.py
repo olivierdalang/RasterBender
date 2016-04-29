@@ -117,7 +117,7 @@ class RasterBenderWorkerThread(QThread):
             """
             Returns a point in pixels coordinates given a point in map coordinates
             """
-            return ( (qgspoint.x() - offX) / mapW * pixW , (qgspoint.y() - offY) / mapH * pixH )
+            return ( (qgspoint.x() - offX) / mapW * pixW + 1.0 , (qgspoint.y() - offY) / mapH * pixH + 1.0 )
 
         # We loop through every triangle to create a GDAL affine transformation
         count = len(triangles)

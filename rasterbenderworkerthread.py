@@ -35,7 +35,7 @@ import numpy
 import subprocess
 
 # Other classes
-import triangulate # it seems we can't import fTools' voronoi directly, so we ship a copy of the file
+import triangulate
 
 
 class RasterBenderWorkerThread(QThread):
@@ -92,10 +92,6 @@ class RasterBenderWorkerThread(QThread):
         # Read the source data into numpy arrays
         dsSource = osgeo.gdal.Open( self.sourcePath, osgeo.gdal.GA_ReadOnly )
 
-        sourceDataR = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1))
-        sourceDataG = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2))
-        sourceDataB = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3))
-
         # Get the transformation
         pixW = float(dsSource.RasterXSize-1) #width in pixel
         pixH = float(dsSource.RasterYSize-1) #width in pixel
@@ -105,6 +101,8 @@ class RasterBenderWorkerThread(QThread):
         mapH = float(dsSource.RasterYSize)*rezY #width in map units
         offX = dsSource.GetGeoTransform()[0] #offset in map units
         offY = dsSource.GetGeoTransform()[3] #offset in map units
+
+        dsSource = None # close the source
 
         # We copy the origin to the destination raster
         # Every succequent drawing will happen on this raster, so that areas that don't move are already ok.

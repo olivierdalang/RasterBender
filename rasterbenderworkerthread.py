@@ -32,11 +32,10 @@ import os.path, shutil
 import sys
 import math
 import numpy
+import subprocess
 
 # Other classes
 import triangulate # it seems we can't import fTools' voronoi directly, so we ship a copy of the file
-import algorithm_trifinder as trifinder
-import algorithm_trimapper as trimapper
 
 
 class RasterBenderWorkerThread(QThread):
@@ -105,157 +104,97 @@ class RasterBenderWorkerThread(QThread):
         offX = dsSource.GetGeoTransform()[0] #offset in map units
         offY = dsSource.GetGeoTransform()[3] #offset in map units
 
-        # Open the target into numpy array
-        #dsTarget = osgeo.gdal.Open(self.targetPath, osgeo.gdal.GA_Update )
-        driver = osgeo.gdal.GetDriverByName( "GTiff" )
-        dsTarget = driver.CreateCopy( self.targetPath, dsSource, 0 )
-        #dsTarget.SetGeoTransform( dsSource.GetGeoTransform() )
-        dsTarget = None #close
+        # We copy the origin to the destination raster
+        shutil.copyfile(self.sourcePath, self.targetPath)
 
 
 
-        def xyToQgsPoint(x, y):
-            return QgsPoint( offX + mapW * (x/pixW), offY + mapH * (y/pixH) )
         def qgsPointToXY(qgspoint):
             return ( (qgspoint.x() - offX) / mapW * pixW , (qgspoint.y() - offY) / mapH * pixH )
 
 
-        #######################################
-        # Step 3A. Looping through the blocks #
-        #######################################
+        for triangle in triangles:
 
-        #Loop through every block
-        blockCountX = dsSource.RasterXSize//self.blockSize+1
-        blockCountY = dsSource.RasterYSize//self.blockSize+1
-        blockCount = blockCountX*blockCountY
-        blockI = 0
-
-        displayTotal = dsSource.RasterXSize*dsSource.RasterYSize
-        displayStep = min((self.blockSize**2)/20,10000) # update gui every n steps
-
-        self.progress.emit( "Starting computation... This can take a while..." , float(0), float(0))        
-
-        for blockNumY in range(0, blockCountY ):
-            blockOffsetY = blockNumY*self.blockSize
-            blockH = min( self.blockSize, dsSource.RasterYSize-blockOffsetY )
-            if blockH <= 0: continue
-
-            for blockNumX in range(0, blockCountX ):
-                blockOffsetX = blockNumX*self.blockSize
-                blockW = min( self.blockSize, dsSource.RasterXSize-blockOffsetX )
-                if blockW <= 0: continue
-
-                blockI += 1
-                pixelCount = blockW*blockH
-                pixelI = 0
-
-                blockRectangle = QgsRectangle(  xyToQgsPoint(blockOffsetX, blockOffsetY), 
-                                                xyToQgsPoint(blockOffsetX+blockW, blockOffsetY+blockH) ) # this is the shape of the block, used for optimization
-
-                # We check if the block intersects the hull, if not, we skip it
-                if not hull.intersects( blockRectangle ):
-                    self.progress.emit( "Block %i out of %i is out of the convex hull, we skip it..."  % (blockI, blockCount), float(0), float(blockI/float(blockCount) ) )
-                    continue
-
-                # We create the trifinder for the block
-                blockTrifinder = trifinder.Trifinder( pointsB, triangles, blockRectangle )
-
-                targetDataR = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(1),blockOffsetX,blockOffsetY,blockW,blockH)
-                targetDataG = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(2),blockOffsetX,blockOffsetY,blockW,blockH)
-                targetDataB = osgeo.gdalnumeric.BandReadAsArray(dsSource.GetRasterBand(3),blockOffsetX,blockOffsetY,blockW,blockH)
+            a0 = qgsPointToXY(pointsA[triangle[0]])
+            b0 = pointsB[triangle[0]]
+            a1 = qgsPointToXY(pointsA[triangle[1]])
+            b1 = pointsB[triangle[1]]
+            a2 = qgsPointToXY(pointsA[triangle[2]])
+            b2 = pointsB[triangle[2]]
 
 
-                #######################################
-                # Step 3B. Looping through the pixels #
-                #######################################
+            # tempWKT = QTemporaryFile()
+            # tempWKT.open()
+            tempWKT = open(self.targetPath+'_tempwkt.csv','w')
+            content = 'WKT\tID\n"POLYGON((%s %s,%s %s,%s %s,%s %s))"\t1' % (b0[0],b0[1],b1[0],b1[1],b2[0],b2[1],b0[0],b0[1])
+            tempWKT.write(content)
+            tempWKT.close()
 
-                # Loop through every pixel
-                for y in range(0, blockH):
-                    for x in range(0, blockW):
-                        # If abort was called, we finish the process
-                        if self._abort:
-                            self.error.emit( "Aborted on pixel %i out of %i on block %i out of %i..."  % (pixelI, pixelCount, blockI, blockCount ), float(0), float(0))
-                            return
 
-                        pixelI+=1
+            tempTranslated = QTemporaryFile()
+            tempTranslated.open()
 
-                        # Ever now and then, we update the status
-                        if pixelI%displayStep == 0:
-                            self.progress.emit("Working on pixel %i out of %i on block %i out of %i... Trifinder has %i triangles"  % (pixelI, pixelCount, blockI, blockCount,len(blockTrifinder.triangles) ), float(pixelI)/float(pixelCount),float(blockI)/float(blockCount) )
-                            
-                        # We find in which triangle the point lies using the trifinder.
-                        p = xyToQgsPoint(blockOffsetX+x, blockOffsetY+y)
-                        tri = blockTrifinder.find( p )
-                        if tri is None:
-                            # If it's in no triangle, we don't change it
-                            continue
 
-                        # If it's in a triangle, we transform the coordinates
-                        newP = trimapper.map(  p, 
-                                                                            pointsB[tri[0]], pointsB[tri[1]], pointsB[tri[2]],
-                                                                            pointsA[tri[0]], pointsA[tri[1]], pointsA[tri[2]] )
 
-                    
+            args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f %s %s' % (
+                a0[0],a0[1],b0[0],b0[1],
+                a1[0],a1[1],b1[0],b1[1],
+                a2[0],a2[1],b2[0],b2[1], 
+                self.sourcePath,
+                tempTranslated.fileName(),
+            )
 
-                        newX, newY = qgsPointToXY(  newP  )
+            try:
+                subprocess.check_output(args)
+            except subprocess.CalledProcessError as e:
+                QgsMessageLog.logMessage( str(e.cmd) )
+                QgsMessageLog.logMessage( e.output )
+                raise e
 
-                        # TODO : this would maybe get interpolated results
-                        #ident = sourceRaster.dataProvider().identify( pt, QgsRaster.IdentifyFormatValue)
-                        #targetDataR[y][x] = ident.results()[1]
-                        #targetDataG[y][x] = ident.results()[2]
-                        #targetDataB[y][x] = ident.results()[3]
+            
+            # args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -crop_to_cutline -overwrite -dstnodata "-999" %s %s' % (
+            #     # tempWKT.fileName(),
+            #     self.targetPath+'_tempwkt.csv',
+            #     tempTranslated.fileName(),
+            #     self.targetPath+'_tempcropped_'+str(i),
+            # )
 
-                        try:
-                            if newY<0 or newX<0: raise IndexError() #avoid looping
+            args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -dstnodata "-999" -r bilinear %s %s' % (
+                # tempWKT.fileName(),
+                self.targetPath+'_tempwkt.csv',
+                tempTranslated.fileName(),
+                self.targetPath,
+            )
 
-                            #      0  1 
-                            # 0   [A][B]
-                            # 1   [C][D]
+            try:
+                subprocess.check_output(args)
+            except subprocess.CalledProcessError as e:
+                QgsMessageLog.logMessage( str(e.cmd) )
+                QgsMessageLog.logMessage( e.output )
+                raise e
 
-                            # The pixel A is at the int value, but we want to interpolate with pixels B, C and D
+            
+            # args = 'python C:\\OSGeo4W\\bin\\gdal_merge.py %s %s' % (
+            #     self.targetPath+'_tempcropped_'+str(i),
+            #     self.targetPath,
+            # )
 
-                            newXint = int(newX)
-                            newXflt = newX-newXint
-                            newYint = int(newY)
-                            newYflt = newY-newYint
+            # try:
+            #     subprocess.check_output(args)
+            # except subprocess.CalledProcessError as e:
+            #     QgsMessageLog.logMessage( str(e.cmd) )
+            #     QgsMessageLog.logMessage( e.output )
+            #     raise e
 
-                            pixA_R = sourceDataR[newYint][newXint]
-                            pixA_G = sourceDataG[newYint][newXint]
-                            pixA_B = sourceDataB[newYint][newXint]
-                            pixB_R = sourceDataR[newYint][newXint+1]
-                            pixB_G = sourceDataG[newYint][newXint+1]
-                            pixB_B = sourceDataB[newYint][newXint+1]
-                            pixC_R = sourceDataR[newYint+1][newXint]
-                            pixC_G = sourceDataG[newYint+1][newXint]
-                            pixC_B = sourceDataB[newYint+1][newXint]
-                            pixD_R = sourceDataR[newYint+1][newXint+1]
-                            pixD_G = sourceDataG[newYint+1][newXint+1]
-                            pixD_B = sourceDataB[newYint+1][newXint+1]
 
-                            R = (1-newYflt)*((1-0-newXflt)*pixA_R + (newXflt)*pixB_R)+(newYflt)*((1-0-newXflt)*pixC_R + (newXflt)*pixD_R)
-                            G = (1-newYflt)*((1-0-newXflt)*pixA_G + (newXflt)*pixB_G)+(newYflt)*((1-0-newXflt)*pixC_G + (newXflt)*pixD_G)
-                            B = (1-newYflt)*((1-0-newXflt)*pixA_B + (newXflt)*pixB_B)+(newYflt)*((1-0-newXflt)*pixC_B + (newXflt)*pixD_B)
 
-                            targetDataR[y][x] = R
-                            targetDataG[y][x] = G
-                            targetDataB[y][x] = B
-                        except IndexError, e:
-                            targetDataR[y][x] = 0
-                            targetDataG[y][x] = 0
-                            targetDataB[y][x] = 0
+            # C:\OSGeo4W\bin\gdal_translate -gcp 52 203 239298 1630759 -gcp 74 168 239313 1630778 -gcp 84 208 239317 1630756 C:/Users/Olivier/Desktop/RasterBenderTests/ORIG.tif 
+            # C:\OSGeo4W\bin\gdalwarp -cutlineC:/Users/Olivier/Desktop/RasterBenderTests/TEST.tif_clip.csv -crop_to_cutline  C:/Users/Olivier/Desktop/RasterBenderTests/TEST.tif
 
-                # Write to the image
-
-                dsTarget = osgeo.gdal.Open(self.targetPath, osgeo.gdal.GA_Update )
-
-                osgeo.gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(1), targetDataR, blockOffsetX, blockOffsetY)  
-                osgeo.gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(2), targetDataG, blockOffsetX, blockOffsetY)  
-                osgeo.gdalnumeric.BandWriteArray(dsTarget.GetRasterBand(3), targetDataB, blockOffsetX, blockOffsetY)
-
-                dsTarget = None
+            tempWKT.close()
+            tempTranslated.close()
 
 
         self.finished.emit()
-        return
 
 

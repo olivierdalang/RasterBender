@@ -44,7 +44,7 @@ class RasterBenderWorkerThread(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str, float) #message, progress percentage
 
-    def __init__(self, pairsLayer, pairsLimitToSelection, constraintsLayer, constraintsLimitToSelection, bufferValue, sourcePath, targetPath):
+    def __init__(self, pairsLayer, pairsLimitToSelection, constraintsLayer, constraintsLimitToSelection, bufferValue, samplingMethod, sourcePath, targetPath):
         QThread.__init__(self)
 
         self.pairsLayer = pairsLayer
@@ -52,6 +52,7 @@ class RasterBenderWorkerThread(QThread):
         self.constraintsLayer = constraintsLayer
         self.constraintsLimitToSelection = constraintsLimitToSelection
         self.bufferValue = bufferValue
+        self.samplingMethod = samplingMethod
 
         self.sourcePath = sourcePath
         self.targetPath = targetPath
@@ -98,44 +99,51 @@ class RasterBenderWorkerThread(QThread):
         # Get the transformation
         pixW = float(dsSource.RasterXSize-1) #width in pixel
         pixH = float(dsSource.RasterYSize-1) #width in pixel
-        mapW = float(dsSource.RasterXSize)*dsSource.GetGeoTransform()[1] #width in map units
-        mapH = float(dsSource.RasterYSize)*dsSource.GetGeoTransform()[5] #width in map units
+        rezX = dsSource.GetGeoTransform()[1] #horizontal resolution
+        rezY = dsSource.GetGeoTransform()[5] #vertical resolution
+        mapW = float(dsSource.RasterXSize)*rezX #width in map units
+        mapH = float(dsSource.RasterYSize)*rezY #width in map units
         offX = dsSource.GetGeoTransform()[0] #offset in map units
         offY = dsSource.GetGeoTransform()[3] #offset in map units
 
         # We copy the origin to the destination raster
+        # Every succequent drawing will happen on this raster, so that areas that don't move are already ok.
+
         shutil.copyfile(self.sourcePath, self.targetPath)
 
 
 
         def qgsPointToXY(qgspoint):
+            """
+            Returns a point in pixels coordinates given a point in map coordinates
+            """
             return ( (qgspoint.x() - offX) / mapW * pixW , (qgspoint.y() - offY) / mapH * pixH )
 
+        # We loop through every triangle to create a GDAL affine transformation
         count = len(triangles)
         for i,triangle in enumerate(triangles):
 
+            if self._abort:
+                self.error.emit( "Aborted on triangle %i out of %i..."  % (i, count))
+                return
+
             self.progress.emit( "Computed triangle %i out of %i..." % (i, count), float(i)/float(count) )
 
+            # aX are the pixels points of the initial triangles
             a0 = qgsPointToXY(pointsA[triangle[0]])
-            b0 = pointsB[triangle[0]]
             a1 = qgsPointToXY(pointsA[triangle[1]])
-            b1 = pointsB[triangle[1]]
             a2 = qgsPointToXY(pointsA[triangle[2]])
+            # bx are the map points of the destination triangle
+            b0 = pointsB[triangle[0]]
+            b1 = pointsB[triangle[1]]
             b2 = pointsB[triangle[2]]
 
+            
 
-            # tempWKT = QTemporaryFile()
-            # tempWKT.open()
-            tempWKT = open(self.targetPath+'_tempwkt.csv','w')
-            content = 'WKT\tID\n"POLYGON((%s %s,%s %s,%s %s,%s %s))"\t1' % (b0[0],b0[1],b1[0],b1[1],b2[0],b2[1],b0[0],b0[1])
-            tempWKT.write(content)
-            tempWKT.close()
-
+            # Step 1 : we do an affine transformation by providing 3 -gcp points
 
             tempTranslated = QTemporaryFile()
             tempTranslated.open()
-
-
 
             args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f %s %s' % (
                 a0[0],a0[1],b0[0],b0[1],
@@ -148,22 +156,27 @@ class RasterBenderWorkerThread(QThread):
             try:
                 subprocess.check_output(args, shell=True)
             except subprocess.CalledProcessError as e:
-                QgsMessageLog.logMessage( str(e.cmd) )
-                QgsMessageLog.logMessage( e.output )
-                raise e
+                self.error.emit( "Error on triangle %i out of %i : \"%s\""  % (i, count, str(e)))
+                return
 
+
+
+            # Step 2 : we draw the transformed layer on the target layer by providing a cutline (corresponding to the destination triangle)
+
+            # We create a vector polygon to feed into GDAL's -cutline argument
+            clip = QgsGeometry.fromPolygon([[b0,b1,b2,b0]]).buffer(.5*abs(rezX)+.5*abs(rezY),2)
+
+            # Since it must be a GDAL format, we have to create a .csv file (hah, command line tools...)
+            tempWKT = QTemporaryFile( os.path.join(QDir.tempPath(),'XXXXXX.csv') )
+            tempWKT.open()
+            content = 'WKT\tID\n"%s"\t1' % (clip.exportToWkt())
+            tempWKT.write(content)
+            tempWKT.close()
             
-            # args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -crop_to_cutline -overwrite -dstnodata "-999" %s %s' % (
-            #     # tempWKT.fileName(),
-            #     self.targetPath+'_tempwkt.csv',
-            #     tempTranslated.fileName(),
-            #     self.targetPath+'_tempcropped_'+str(i),
-            # )
 
-            # args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -dstnodata "-999" -r bilinear %s %s' % (
-            args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -cblend 1 -dstnodata "-999" -r bilinear %s %s' % (
-                # tempWKT.fileName(),
-                self.targetPath+'_tempwkt.csv',
+            args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -cblend 1 -dstnodata "-999" -r %s %s %s' % (
+                tempWKT.fileName(),
+                self.samplingMethod,
                 tempTranslated.fileName(),
                 self.targetPath,
             )
@@ -171,27 +184,9 @@ class RasterBenderWorkerThread(QThread):
             try:
                 subprocess.check_output(args, shell=True)
             except subprocess.CalledProcessError as e:
-                QgsMessageLog.logMessage( str(e.cmd) )
-                QgsMessageLog.logMessage( e.output )
-                raise e
+                self.error.emit( "Error on triangle %i out of %i : \"%s\""  % (i, count, str(e)))
+                return
 
-            
-            # args = 'python C:\\OSGeo4W\\bin\\gdal_merge.py %s %s' % (
-            #     self.targetPath+'_tempcropped_'+str(i),
-            #     self.targetPath,
-            # )
-
-            # try:
-            #     subprocess.check_output(args, shell=True)
-            # except subprocess.CalledProcessError as e:
-            #     QgsMessageLog.logMessage( str(e.cmd) )
-            #     QgsMessageLog.logMessage( e.output )
-            #     raise e
-
-
-
-            # C:\OSGeo4W\bin\gdal_translate -gcp 52 203 239298 1630759 -gcp 74 168 239313 1630778 -gcp 84 208 239317 1630756 C:/Users/Olivier/Desktop/RasterBenderTests/ORIG.tif 
-            # C:\OSGeo4W\bin\gdalwarp -cutlineC:/Users/Olivier/Desktop/RasterBenderTests/TEST.tif_clip.csv -crop_to_cutline  C:/Users/Olivier/Desktop/RasterBenderTests/TEST.tif
 
             tempWKT.close()
             tempTranslated.close()

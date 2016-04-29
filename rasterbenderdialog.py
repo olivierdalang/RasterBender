@@ -26,7 +26,14 @@ class RasterBenderDialog(QWidget):
         self.worker = None
         self.workerThread = None
 
-        # Keeps three rubberbands for delaunay's peview
+        # Populate GDAL's interpolation methods
+        self.samplingComboBox.clear()
+        for method in ('near','bilinear','cubic','cubicspline','lanczos','average','mode',):
+            self.samplingComboBox.addItem( method, method )
+        self.samplingComboBox.setCurrentIndex(1)
+        
+
+         # Keeps three rubberbands for delaunay's peview
         self.rubberBands = (QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon),
                             QgsRubberBand(self.iface.mapCanvas(), QGis.Polygon))
 
@@ -109,6 +116,12 @@ class RasterBenderDialog(QWidget):
         Returns the current buffer value depending on the input in the spinbox
         """
         return self.bufferSpinBox.value()
+    def samplingMethod(self):
+        """
+        Returns the current sampling method name (to be used as GDAL argument)
+        """
+        return self.samplingComboBox.itemData(self.samplingComboBox.currentIndex())
+
 
     # Thread management
     def run(self):
@@ -121,7 +134,7 @@ class RasterBenderDialog(QWidget):
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 
-            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.pairsLayerRestrictToSelection(), self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue(), self.sourceRasterPath(), self.targetRasterPath() )
+            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.pairsLayerRestrictToSelection(), self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue(), self.samplingMethod(), self.sourceRasterPath(), self.targetRasterPath() )
 
             self.workerThread.finished.connect( self.finish )
             self.workerThread.error.connect( self.error )

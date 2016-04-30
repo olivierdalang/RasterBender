@@ -150,18 +150,18 @@ class RasterBenderWorkerThread(QThread):
             tempTranslated = QTemporaryFile()
             tempTranslated.open()
 
-            # TODO : get the propper path the gdal
-            args = 'C:\\OSGeo4W\\bin\\gdal_translate -gcp %f %f %f %f -gcp %f %f %f %f -gcp %f %f %f %f -srcwin %f %f %f %f %s %s' % (
-                a0[0]-xoff,a0[1]-yoff,b0[0],b0[1],
-                a1[0]-xoff,a1[1]-yoff,b1[0],b1[1],
-                a2[0]-xoff,a2[1]-yoff,b2[0],b2[1], 
-                xoff, yoff, xsize, ysize, 
+
+            args = ['gdal_translate',
+                '-gcp', a0[0]-xoff,a0[1]-yoff,b0[0],b0[1],
+                '-gcp', a1[0]-xoff,a1[1]-yoff,b1[0],b1[1],
+                '-gcp', a2[0]-xoff,a2[1]-yoff,b2[0],b2[1], 
+                '-srcwin', xoff, yoff, xsize, ysize, 
                 self.sourcePath,
                 tempTranslated.fileName(),
-            )
+            ]
 
             try:
-                subprocess.check_output(args, shell=True)
+                subprocess.check_output([str(a) for a in args], shell=True)
             except subprocess.CalledProcessError as e:
                 self.error.emit( "Error on triangle %i out of %i : \"%s\" (%s)"  % (i, count, e.output, e.cmd))
                 return
@@ -181,16 +181,17 @@ class RasterBenderWorkerThread(QThread):
             tempWKT.close()
             
 
-            # TODO : get the propper path the gdal
-            args = 'C:\\OSGeo4W\\bin\\gdalwarp -cutline %s -cblend 1 -dstnodata "-999" -r %s %s %s' % (
-                tempWKT.fileName(),
-                self.samplingMethod,
+            args = [ 'gdalwarp',
+                '-cutline', tempWKT.fileName(),
+                '-cblend', '1', 
+                '-dstnodata', '-999',
+                '-r', self.samplingMethod,
                 tempTranslated.fileName(),
                 self.targetPath,
-            )
+            ]
 
             try:
-                subprocess.check_output(args, shell=True)
+                subprocess.check_output([str(a) for a in args], shell=True)
             except subprocess.CalledProcessError as e:
                 self.error.emit( "Error on triangle %i out of %i : \"%s\" (%s)"  % (i, count, e.output, e.cmd))
                 return

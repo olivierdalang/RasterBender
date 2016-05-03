@@ -33,6 +33,7 @@ import sys
 import math
 import numpy
 import subprocess
+import json
 
 # Other classes
 import triangulate
@@ -107,7 +108,35 @@ class RasterBenderWorkerThread(QThread):
         # We copy the origin to the destination raster
         # Every succequent drawing will happen on this raster, so that areas that don't move are already ok.
 
-        shutil.copyfile(self.sourcePath, self.targetPath)
+        # We get the informations of the source layer to use the same format for output
+        args = ['gdalinfo',
+                '-json',
+                self.sourcePath,
+            ]
+
+        try:
+            json_infos = subprocess.check_output([str(a) for a in args], shell=True)
+            infos = json.loads(json_infos)
+            output_format = infos['driverShortName']
+        except subprocess.CalledProcessError as e:
+            self.error.emit( "Could not get the file infos ! : \"%s\" (%s)"  % (e.output, e.cmd))
+            return
+        except Exception as e:
+            self.error.emit( "Could not get the file infos ! : \"%s\""  % str(e))
+            return
+
+        # And we create a copy of the same format using -of parameter
+        args = ['gdal_translate',
+                '-of', output_format, 
+                self.sourcePath,
+                self.targetPath,
+            ]
+
+        try:
+            subprocess.check_output([str(a) for a in args], shell=True)
+        except subprocess.CalledProcessError as e:
+            self.error.emit( "Could not copy the file ! : \"%s\" (%s)"  % (e.output, e.cmd))
+            return
 
 
 

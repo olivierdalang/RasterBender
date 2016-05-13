@@ -14,7 +14,7 @@ qgisMinimumVersion=2.6
 description=Distort rasters with high local deformation (such as historical maps) to adapt to contemporary data. This feature is also known as "rubber sheeting".
 about=Distort rasters with high local deformation (such as historical maps) to adapt to contemporary data. This feature is also known as "rubber sheeting".
 category=Raster
-version=0.0.2
+version=0.0.3
 author=Olivier Dalang
 email=olivier.dalang@gmail.com
 

@@ -45,6 +45,10 @@ Or send me some feedback at : olivier.dalang@gmail.com
 
 RasterBender is in its early stages of developpement, and is not much tested. Please be very careful and report any unexpected behaviour.
 
+## Known limitations
+
+It is currently not possible to defined GCPs outside of the raster.
+
 ## Version history
 
 - 2014-11-17 - Version 0.0 : intial release

@@ -37,17 +37,15 @@ The constraint layers allow to prevent triangles edges from passing through cert
 To use the constraints layer, create lines that join the starting point of at least two pairs. Preview the result to see the effect. Note that you must enable snapping for the constraints to work (constraints must pass exactly through the pairs' starting points).
 
 
-## Feedback / Bugs / Contribute
+## Feedback / Bugs / Contribute / Known limitations
 
-Please report bugs and ideas on the issue tracker : https://github.com/olivierdalang/RasterBender/issues
+Please report bugs and ideas and see known limitations on the issue tracker : https://github.com/olivierdalang/RasterBender/issues
+
+When reporting bugs, run the plugin with the debug checkbox and copy all QGIS's log. 
 
 Or send me some feedback at : olivier.dalang@gmail.com
 
 RasterBender is in its early stages of developpement, and is not much tested. Please be very careful and report any unexpected behaviour.
-
-## Known limitations
-
-It is currently not possible to defined GCPs outside of the raster.
 
 ## Version history
 
@@ -55,6 +53,7 @@ It is currently not possible to defined GCPs outside of the raster.
 - 2014-11-18 - Version 0.0.1 : add style button
 - 2016-04-27 - Version 0.0.2 : the deformation is interpolated
 - 2016-05-07 - Version 0.0.3 : the transformation now uses GDAL
+- 2016-05-18 - Version 0.0.4 : bugfix with older versions of GDAL, added debug checkbox
 
 ## Sponsors
 

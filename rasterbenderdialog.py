@@ -121,6 +121,11 @@ class RasterBenderDialog(QWidget):
         Returns the current sampling method name (to be used as GDAL argument)
         """
         return self.samplingComboBox.itemData(self.samplingComboBox.currentIndex())
+    def debug(self):
+        """
+        Returns the current sampling method name (to be used as GDAL argument)
+        """
+        return self.debugCheckBox.isChecked()
 
 
     # Thread management
@@ -134,7 +139,7 @@ class RasterBenderDialog(QWidget):
             self.runButton.setEnabled(False)
             self.abortButton.setEnabled(True)
 
-            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.pairsLayerRestrictToSelection(), self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue(), self.samplingMethod(), self.sourceRasterPath(), self.targetRasterPath() )
+            self.workerThread = RasterBenderWorkerThread( self.pairsLayer(), self.pairsLayerRestrictToSelection(), self.constraintsLayer(), self.constraintsLayerRestrictToSelection(), self.bufferValue(), self.samplingMethod(), self.sourceRasterPath(), self.targetRasterPath(), self.debug() )
 
             self.workerThread.finished.connect( self.finish )
             self.workerThread.error.connect( self.error )

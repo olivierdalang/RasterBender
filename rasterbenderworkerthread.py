@@ -45,7 +45,7 @@ class RasterBenderWorkerThread(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str, float) #message, progress percentage
 
-    def __init__(self, pairsLayer, pairsLimitToSelection, constraintsLayer, constraintsLimitToSelection, bufferValue, samplingMethod, sourcePath, targetPath):
+    def __init__(self, pairsLayer, pairsLimitToSelection, constraintsLayer, constraintsLimitToSelection, bufferValue, samplingMethod, sourcePath, targetPath, debug):
         QThread.__init__(self)
 
         self.pairsLayer = pairsLayer
@@ -58,9 +58,35 @@ class RasterBenderWorkerThread(QThread):
         self.sourcePath = sourcePath
         self.targetPath = targetPath
 
+        self.debug = debug
+
         self._abort = False
 
 
+    def log(self,message, debug_only=False):
+        if debug_only is False or self.debug is True:
+            QgsMessageLog.logMessage(message,'RasterBender' if not debug_only else 'RasterBender-debug')
+
+
+    def runCommand(self, args, operation_name = 'run the command'):
+        str_args = [str(a) for a in args]
+        try:
+            self.log('# COMMAND   : '+operation_name,True)
+            self.log(subprocess.list2cmdline(str_args),True)
+            result = subprocess.check_output(str_args, shell=True, stderr=subprocess.STDOUT) 
+            self.log('# OUTPUT    : '+operation_name,True)           
+            self.log(result,True)
+            return (True,result)
+        except subprocess.CalledProcessError as e: 
+            self.log('# ERROR     : '+operation_name,True)           
+            self.log(e.output,True)
+            self.error.emit( "Could not %s ! : \"%s\" [%s]"  % (operation_name, e.output, subprocess.list2cmdline(e.cmd)))
+            return (False, e.output)
+        except Exception as e:
+            self.log('# EXCEPTION : '+operation_name,True)           
+            self.log(str(e),True)
+            self.error.emit( "Could not %s ! : \"%s\""  % (operation_name,str(e),))
+            return (False, None)
 
     def abort(self):
         self._abort = True
@@ -68,6 +94,13 @@ class RasterBenderWorkerThread(QThread):
     def run(self):
 
         self._abort = False
+
+        if self.debug:
+            args = ['gdalinfo',
+                '--version',
+            ]
+            sucess, result = self.runCommand(args, 'get GDAL version')
+
 
         self.progress.emit("Starting RasterBender", float(0))
 
@@ -110,34 +143,31 @@ class RasterBenderWorkerThread(QThread):
 
         # We get the informations of the source layer to use the same format for output
         args = ['gdalinfo',
-                '-json',
+                # '-json', # -json doesn't exist in GDAL<2.0
                 self.sourcePath,
             ]
 
-        try:
-            json_infos = subprocess.check_output([str(a) for a in args], shell=True)
-            infos = json.loads(json_infos)
-            output_format = infos['driverShortName']
-        except subprocess.CalledProcessError as e:
-            self.error.emit( "Could not get the file infos ! : \"%s\" (%s)"  % (e.output, e.cmd))
-            return
-        except Exception as e:
-            self.error.emit( "Could not get the file infos ! : \"%s\""  % str(e))
-            return
+        sucess, result = self.runCommand(args, 'get the file infos')
+        # output_format = json.loads(result)['driverShortName'] # -json doesn't exist in GDAL<2.0, so we use this:
+        if not sucess: return
+        output_format = None
+        for line in result.split('\n'):
+            if line[0:8]=='Driver: ':
+                output_format = line[8:].split('/')[0]
+                break
 
-        # And we create a copy of the same format using -of parameter
-        args = ['gdal_translate',
-                '-of', output_format, 
+
+        # And we create a copy
+        args = ['gdal_translate', 
                 self.sourcePath,
                 self.targetPath,
             ]
+        # If we has an input format, we set it using -of parameter
+        if output_format:
+            args.extend(['-of',output_format])
 
-        try:
-            subprocess.check_output([str(a) for a in args], shell=True)
-        except subprocess.CalledProcessError as e:
-            self.error.emit( "Could not copy the file ! : \"%s\" (%s)"  % (e.output, e.cmd))
-            return
-
+        sucess, result = self.runCommand(args, 'copy the file')
+        if not sucess: return
 
 
         def qgsPointToXY(qgspoint):
@@ -151,10 +181,10 @@ class RasterBenderWorkerThread(QThread):
         for i,triangle in enumerate(triangles):
 
             if self._abort:
-                self.error.emit( "Aborted on triangle %i out of %i..."  % (i, count))
+                self.error.emit( "Aborted on triangle %i out of %i..."  % (i+1, count))
                 return
 
-            self.progress.emit( "Computing triangle %i out of %i..." % (i, count), float(i)/float(count) )
+            self.progress.emit( "Computing triangle %i out of %i..." % (i+1, count), float(i)/float(count) )
 
             # aX are the pixels points of the initial triangles
             a0 = qgsPointToXY(pointsA[triangle[0]])
@@ -177,6 +207,7 @@ class RasterBenderWorkerThread(QThread):
             ysize = min(    max(a0[1],a1[1],a2[1])+2-yoff    ,pixH-yoff)
 
             tempTranslated = QTemporaryFile()
+            if self.debug: tempTranslated.setAutoRemove(False)
             tempTranslated.open()
 
 
@@ -189,11 +220,8 @@ class RasterBenderWorkerThread(QThread):
                 tempTranslated.fileName(),
             ]
 
-            try:
-                subprocess.check_output([str(a) for a in args], shell=True)
-            except subprocess.CalledProcessError as e:
-                self.error.emit( "Error on triangle %i out of %i : \"%s\" (%s)"  % (i, count, e.output, e.cmd))
-                return
+            sucess, result = self.runCommand(args, 'create the temporaray file %i out of %i' % (i+1, count))
+            if not sucess: return
 
 
 
@@ -204,6 +232,7 @@ class RasterBenderWorkerThread(QThread):
 
             # Since it must be a GDAL format, we have to create a .csv file (hah, command line tools...)
             tempWKT = QTemporaryFile( os.path.join(QDir.tempPath(),'XXXXXX.csv') )
+            if self.debug: tempWKT.setAutoRemove(False)
             tempWKT.open()
             content = 'WKT\tID\n"%s"\t1' % (clip.exportToWkt())
             tempWKT.write(content)
@@ -219,15 +248,10 @@ class RasterBenderWorkerThread(QThread):
                 self.targetPath,
             ]
 
-            try:
-                subprocess.check_output([str(a) for a in args], shell=True)
-            except subprocess.CalledProcessError as e:
-                self.error.emit( "Error on triangle %i out of %i : \"%s\" (%s)"  % (i, count, e.output, e.cmd))
-                return
+            sucess, result = self.runCommand(args, 'patch the triangle %i out of %i' % (i+1, count))
+            if not sucess: return
 
 
-            tempWKT.close()
-            tempTranslated.close()
 
 
         self.finished.emit()

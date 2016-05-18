@@ -141,11 +141,13 @@ class RasterBenderWorkerThread(QThread):
         pixW = float(dsSource.RasterXSize-1) #width in pixel
         pixH = float(dsSource.RasterYSize-1) #width in pixel
         rezX = dsSource.GetGeoTransform()[1] #horizontal resolution
-        rezY = dsSource.GetGeoTransform()[5] #vertical resolution
+        rezY = dsSource.GetGeoTransform()[5] #vertical resolution # this should give -1 if the raster has no geotransform, but it does not...
         mapW = float(dsSource.RasterXSize)*rezX #width in map units
         mapH = float(dsSource.RasterYSize)*rezY #width in map units
         offX = dsSource.GetGeoTransform()[0] #offset in map units
         offY = dsSource.GetGeoTransform()[3] #offset in map units
+
+        self.log('pixW:{} pixH:{} rezX:{} rezY:{} mapW:{} mapH:{} offX:{} offY:{}'.format(pixW,pixH,rezX,rezY,mapW,mapH,offX,offY), True )
 
         dsSource = None # close the source
 
@@ -162,10 +164,12 @@ class RasterBenderWorkerThread(QThread):
         # output_format = json.loads(result)['driverShortName'] # -json doesn't exist in GDAL<2.0, so we use this:
         if not sucess: return
         output_format = None
+        geotransform_found = False
         for line in result.split('\n'):
             if line[0:8]=='Driver: ':
                 output_format = line[8:].split('/')[0]
-                break
+            if line[0:13]=='Pixel Size = ':
+                geotransform_found=True
 
 
         # And we create a copy
@@ -175,7 +179,19 @@ class RasterBenderWorkerThread(QThread):
             ]
         # If we has an input format, we set it using -of parameter
         if output_format:
+            self.log('Output format was found : {}'.format(output_format), True)
             args.extend(['-of',output_format])
+        else:
+            self.log('Output format was not found.', True)
+        if geotransform_found:
+            self.log('Geotransform was found.', True)
+        else:
+            # If we have no geotransform, we use GCPs to match 1 pixel = 1 map unit.
+            args.extend(['-gcp',0,0,0,0])
+            args.extend(['-gcp',0,1,0,-1])
+            args.extend(['-gcp',1,0,1,0])
+            rezY = -rezY # hack, see above
+            self.log('Geotransform was not found. We created GCPs', True)
 
         sucess, result = self.runCommand(args, 'copy the file')
         if not sucess: return
@@ -185,7 +201,7 @@ class RasterBenderWorkerThread(QThread):
             """
             Returns a point in pixels coordinates given a point in map coordinates
             """
-            return ( (qgspoint.x() - offX) / mapW * pixW + 1.0 , (qgspoint.y() - offY) / mapH * pixH + 1.0 )
+            return ( (qgspoint.x() - offX) / rezX + 1.0 , (qgspoint.y() - offY) / rezY + 1.0 )
 
         # We loop through every triangle to create a GDAL affine transformation
         count = len(triangles)
@@ -212,15 +228,20 @@ class RasterBenderWorkerThread(QThread):
 
             # here we compute the parameters for srcwin, so that we don't compute the transformation on the whole raster
             # we have a 2 pixels margins, hence the +/- 2 and the enclosing max/min (to avoid overbound)
-            xoff = max(    min(a0[0],a1[0],a2[0])-2    ,0)
-            yoff = max(    min(a0[1],a1[1],a2[1])-2    ,0)
-            xsize = min(    max(a0[0],a1[0],a2[0])+2-xoff    ,pixW-xoff)
-            ysize = min(    max(a0[1],a1[1],a2[1])+2-yoff    ,pixH-yoff)
+
+            xMin = min(a0[0],a1[0],a2[0])
+            yMin = min(a0[1],a1[1],a2[1])
+            xMax = max(a0[0],a1[0],a2[0])
+            yMax = max(a0[1],a1[1],a2[1])
+
+            xoff = xMin-2
+            yoff = yMin-2
+            xsize = xMax-xMin+4
+            ysize = yMax-yMin+4
 
             tempTranslated = QTemporaryFile()
             if self.debug: tempTranslated.setAutoRemove(False)
             tempTranslated.open()
-
 
             args = ['gdal_translate',
                 '-gcp', a0[0]-xoff,a0[1]-yoff,b0[0],b0[1],

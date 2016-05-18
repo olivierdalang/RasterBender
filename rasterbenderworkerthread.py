@@ -30,6 +30,7 @@ from qgis.gui import *
 import osgeo, osgeo.gdalnumeric
 import os.path, shutil
 import sys
+import traceback
 import math
 import numpy
 import subprocess
@@ -93,8 +94,15 @@ class RasterBenderWorkerThread(QThread):
 
     def abort(self):
         self._abort = True
-    
+
     def run(self):
+        try:
+            self.doRun()
+        except Exception as e:
+            self.error.emit('An unexpected exception occured ! See QGIS log for details.')
+            self.log(traceback.format_exc())
+    
+    def doRun(self):
 
         self._abort = False
 

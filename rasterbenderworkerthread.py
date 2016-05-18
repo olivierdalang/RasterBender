@@ -65,26 +65,29 @@ class RasterBenderWorkerThread(QThread):
 
     def log(self,message, debug_only=False):
         if debug_only is False or self.debug is True:
-            QgsMessageLog.logMessage(message,'RasterBender' if not debug_only else 'RasterBender-debug')
+            QgsMessageLog.logMessage(message,'RasterBender')
+    def log_gdal(self,message):
+        if self.debug is True:
+            QgsMessageLog.logMessage(message,'RasterBender-gdal')
 
 
     def runCommand(self, args, operation_name = 'run the command'):
         str_args = [str(a) for a in args]
         try:
-            self.log('# COMMAND   : '+operation_name,True)
-            self.log(subprocess.list2cmdline(str_args),True)
+            self.log_gdal('# COMMAND   : '+operation_name,True)
+            self.log_gdal(subprocess.list2cmdline(str_args),True)
             result = subprocess.check_output(str_args, shell=True, stderr=subprocess.STDOUT) 
-            self.log('# OUTPUT    : '+operation_name,True)           
-            self.log(result,True)
+            self.log_gdal('# OUTPUT    : '+operation_name,True)           
+            self.log_gdal(result,True)
             return (True,result)
         except subprocess.CalledProcessError as e: 
-            self.log('# ERROR     : '+operation_name,True)           
-            self.log(e.output,True)
+            self.log_gdal('# ERROR     : '+operation_name,True)           
+            self.log_gdal(e.output,True)
             self.error.emit( "Could not %s ! : \"%s\" [%s]"  % (operation_name, e.output, subprocess.list2cmdline(e.cmd)))
             return (False, e.output)
         except Exception as e:
-            self.log('# EXCEPTION : '+operation_name,True)           
-            self.log(str(e),True)
+            self.log_gdal('# EXCEPTION : '+operation_name,True)           
+            self.log_gdal(str(e),True)
             self.error.emit( "Could not %s ! : \"%s\""  % (operation_name,str(e),))
             return (False, None)
 

@@ -28,7 +28,7 @@ changelog=- 2014-11-17 - Version 0.0 : intial release
 - 2016-04-27 - Version 0.0.2 : the raster is now interpolated (sponsored by Geodeticca http://www.geodeticca.sk)
 - 2016-05-07 - Version 0.0.3 : the transformation now uses GDAL (sponsored by Geodeticca http://www.geodeticca.sk)
 - 2016-05-18 - Version 0.0.4 : bugfix with older versions of GDAL, debug checkbox (sponsored by Geodeticca http://www.geodeticca.sk)
-- 2016-05-18 - Version 0.0.5 : works with non-georeferenced rasters again
+- 2016-05-19 - Version 0.0.5 : works with non-georeferenced rasters again (sponsored by Geodeticca http://www.geodeticca.sk)
 
 
 

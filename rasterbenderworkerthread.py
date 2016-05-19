@@ -77,7 +77,7 @@ class RasterBenderWorkerThread(QThread):
         try:
             self.log_gdal('# COMMAND   : '+operation_name)
             self.log_gdal(subprocess.list2cmdline(str_args))
-            result = subprocess.check_output(str_args, shell=True, stderr=subprocess.STDOUT) 
+            result = subprocess.check_output(str_args, shell=True, stdin=subprocess.PIPE, stderr=subprocess.STDOUT) 
             self.log_gdal('# OUTPUT    : '+operation_name)           
             self.log_gdal(result)
             return (True,result)

@@ -86,6 +86,11 @@ class RasterBenderWorkerThread(QThread):
             self.log_gdal(e.output)
             self.error.emit( "Could not %s ! : \"%s\" [%s]"  % (operation_name, e.output, subprocess.list2cmdline(e.cmd)))
             return (False, e.output)
+        except Exception as e:
+            self.log_gdal('# EXCEPTION : '+operation_name)           
+            self.log_gdal(str(e))
+            self.error.emit( "Could not %s ! : \"%s\""  % (operation_name,str(e),))
+            return (False, None)
 
     def abort(self):
         self._abort = True

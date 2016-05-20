@@ -55,10 +55,11 @@ RasterBender is in its early stages of developpement, and is not much tested. Pl
 - 2016-05-07 - Version 0.0.3 : the transformation now uses GDAL
 - 2016-05-18 - Version 0.0.4 : bugfix with older versions of GDAL, added debug checkbox
 - 2016-05-19 - Version 0.0.5 : works with non-georeferenced rasters again
+- 2016-05-19 - Version 0.0.6 : fix a windows 7 specific issue
 
 ## Sponsors
 
-Many thanks to Geodeticca for sponsoring the developpement of the versions 0.0.2 through 0.0.5 of this plugin. [http://www.geodeticca.sk](http://www.geodeticca.sk)
+Many thanks to Geodeticca for sponsoring the developpement of the versions 0.0.2 through 0.0.6 of this plugin. [http://www.geodeticca.sk](http://www.geodeticca.sk)
 
 ## How it works (internally)
 
